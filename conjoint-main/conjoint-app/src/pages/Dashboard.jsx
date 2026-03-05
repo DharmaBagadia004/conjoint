@@ -6,11 +6,6 @@ function Dashboard() {
   const navigate = useNavigate();
   const [surveys, setSurveys] = useState([]);
 
-  const loadSurveys = () => {
-    const stored = JSON.parse(localStorage.getItem("surveys")) || [];
-    setSurveys(stored);
-  };
-
   useEffect(() => {
   const fetchSurveys = async () => {
     try {

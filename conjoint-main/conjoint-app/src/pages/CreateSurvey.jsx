@@ -5,6 +5,8 @@ import axios from "axios";
 
 function CreateSurvey() {
     const navigate = useNavigate();
+  const [datasetFile, setDatasetFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
 
   const [survey, setSurvey] = useState({
     title: "",
@@ -139,7 +141,7 @@ const saveSurvey = async () => {
       }))
     };
 
-    const res = await axios.post(
+    await axios.post(
       "http://localhost:5000/api/conjoint-surveys",
       payload
     );
@@ -149,6 +151,43 @@ const saveSurvey = async () => {
   } catch (error) {
     console.error(error);
     alert("Error saving survey");
+  }
+};
+
+const importDatasetAndRun = async () => {
+  if (!datasetFile) {
+    alert("Please select a CSV or JSON file.");
+    return;
+  }
+
+  setIsImporting(true);
+
+  try {
+    const formData = new FormData();
+    formData.append("file", datasetFile);
+
+    if (survey.title.trim()) {
+      formData.append("title", survey.title.trim());
+    }
+
+    const response = await axios.post(
+      "http://localhost:5000/api/conjoint-surveys/import",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" }
+      }
+    );
+
+    alert(`Survey "${response.data.title}" imported successfully.`);
+    navigate(`/run/${response.data.id}`);
+  } catch (error) {
+    console.error(error);
+    alert(
+      error?.response?.data?.error ||
+      "Unable to import dataset."
+    );
+  } finally {
+    setIsImporting(false);
   }
 };
 
@@ -162,6 +201,39 @@ const saveSurvey = async () => {
       <p className="text-gray-500 mt-2 text-sm">
         Define attributes and levels for your study.
       </p>
+    </div>
+
+    {/* Dataset Import */}
+    <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-8">
+      <h2 className="text-sm font-semibold text-gray-900 mb-2">
+        Import From Dataset
+      </h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Upload a CSV or JSON file. Columns become attributes and unique values become levels.
+      </p>
+
+      <div className="flex flex-wrap items-center gap-4">
+        <input
+          type="file"
+          accept=".csv,.json,application/json,text/csv"
+          onChange={(e) => setDatasetFile(e.target.files?.[0] || null)}
+          className="text-sm text-gray-700"
+        />
+
+        <button
+          onClick={importDatasetAndRun}
+          disabled={isImporting}
+          className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {isImporting ? "Importing..." : "Import Dataset & Run Survey"}
+        </button>
+      </div>
+
+      {datasetFile && (
+        <p className="text-xs text-gray-500 mt-3">
+          Selected file: {datasetFile.name}
+        </p>
+      )}
     </div>
 
     {/* Survey Title */}

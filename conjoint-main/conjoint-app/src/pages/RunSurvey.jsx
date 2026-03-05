@@ -13,6 +13,7 @@ function RunSurvey() {
   const [responses, setResponses] = useState([]);
   const [taskNumber, setTaskNumber] = useState(1);
   const [completed, setCompleted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
 
 useEffect(() => {
@@ -53,7 +54,11 @@ useEffect(() => {
     });
   };
 
-  const handleChoice = (choice) => {
+  const handleChoice = async (choice) => {
+    if (!currentTask || isSubmitting) {
+      return;
+    }
+
     const newResponse = {
       task: taskNumber,
       chosen: choice,
@@ -61,21 +66,26 @@ useEffect(() => {
       optionB: currentTask.optionB
     };
 
-    const updatedResponses = [...responses, newResponse];
-    setResponses(updatedResponses);
-
     if (taskNumber >= TOTAL_TASKS) {
-      saveResponses(updatedResponses);
-      setCompleted(true);
+      const updatedResponses = [...responses, newResponse];
+      const saved = await saveResponses(updatedResponses);
+      if (saved) {
+        setResponses(updatedResponses);
+        setCompleted(true);
+        navigate(`/results/${id}`);
+      }
       return;
     }
 
+    const updatedResponses = [...responses, newResponse];
+    setResponses(updatedResponses);
     setTaskNumber(prev => prev + 1);
     generateTask(survey);
   };
 
 
 const saveResponses = async (finalResponses) => {
+  setIsSubmitting(true);
   try {
     await axios.post(
       `http://localhost:5000/api/conjoint-surveys/${id}/submit`,
@@ -83,9 +93,13 @@ const saveResponses = async (finalResponses) => {
         responses: finalResponses
       }
     );
+    return true;
   } catch (err) {
     console.error(err);
     alert("Error saving responses");
+    return false;
+  } finally {
+    setIsSubmitting(false);
   }
 };
 
@@ -179,9 +193,10 @@ if (!survey)
 
           <button
             onClick={() => handleChoice("A")}
-            className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
+            disabled={isSubmitting}
+            className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Choose Option A
+            {isSubmitting ? "Submitting..." : "Choose Option A"}
           </button>
         </div>
 
@@ -211,9 +226,10 @@ if (!survey)
 
           <button
             onClick={() => handleChoice("B")}
-            className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition"
+            disabled={isSubmitting}
+            className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Choose Option B
+            {isSubmitting ? "Submitting..." : "Choose Option B"}
           </button>
         </div>
       </div>

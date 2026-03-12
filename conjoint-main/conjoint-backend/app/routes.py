@@ -1,8 +1,12 @@
 import csv
 import io
 import json
+import os
+import random
+import re
 from collections import defaultdict
 from pathlib import Path
+from urllib import error, request as urllib_request
 
 from flask import Blueprint, jsonify, request
 
@@ -11,6 +15,7 @@ from .models import (
     ConjointAttribute,
     ConjointChoice,
     ConjointLevel,
+    ConjointPersona,
     ConjointRespondent,
     ConjointSurvey,
 )
@@ -23,6 +28,40 @@ def _normalize_text(value):
         return None
     text = str(value).strip()
     return text or None
+
+
+def _parse_persona_attributes(raw_attributes):
+    if isinstance(raw_attributes, dict):
+        parsed = {}
+        for key, value in raw_attributes.items():
+            clean_key = _normalize_text(key)
+            clean_value = _normalize_text(value)
+            if clean_key and clean_value:
+                parsed[clean_key] = clean_value
+        return parsed
+
+    if isinstance(raw_attributes, list):
+        parsed = {}
+        for row in raw_attributes:
+            if not isinstance(row, dict):
+                continue
+            clean_key = _normalize_text(row.get("key"))
+            clean_value = _normalize_text(row.get("value"))
+            if clean_key and clean_value:
+                parsed[clean_key] = clean_value
+        return parsed
+
+    return {}
+
+
+def _serialize_persona(persona):
+    return {
+        "id": persona.id,
+        "survey_id": persona.survey_id,
+        "name": persona.name,
+        "attributes": persona.attributes,
+        "created_at": persona.created_at,
+    }
 
 
 def _persist_survey(title, attributes):
@@ -136,6 +175,117 @@ def _parse_json_dataset(raw_bytes):
     )
 
 
+def _generate_random_profile(attributes):
+    profile = {}
+    for attr in attributes:
+        levels = [level.value for level in attr.levels]
+        if not levels:
+            continue
+        profile[attr.name] = random.choice(levels)
+    return profile
+
+
+def _generate_task_options(attributes):
+    option_a = _generate_random_profile(attributes)
+    option_b = _generate_random_profile(attributes)
+    attempts = 0
+
+    while option_a == option_b and attempts < 10:
+        option_b = _generate_random_profile(attributes)
+        attempts += 1
+
+    return option_a, option_b
+
+
+def _extract_choice_from_llm_content(content):
+    if not content:
+        return None
+
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            choice = _normalize_text(parsed.get("choice"))
+            if choice:
+                choice = choice.upper()
+                if choice in {"A", "B"}:
+                    return choice
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\b([AB])\b", content.upper())
+    if match:
+        return match.group(1)
+
+    return None
+
+
+def _call_llm_choice(survey, persona, task_number, option_a, option_b):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. Configure it before running persona simulations."
+        )
+
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1").rstrip("/")
+
+    system_message = (
+        "You are a survey respondent simulator. "
+        "Given a persona and two product options, choose exactly one option. "
+        "Output valid JSON: {\"choice\":\"A\"} or {\"choice\":\"B\"}."
+    )
+
+    user_message = (
+        f"Survey title: {survey.title}\n"
+        f"Task number: {task_number}\n"
+        f"Persona attributes: {json.dumps(persona.attributes, ensure_ascii=True)}\n"
+        f"Option A: {json.dumps(option_a, ensure_ascii=True)}\n"
+        f"Option B: {json.dumps(option_b, ensure_ascii=True)}\n"
+        "Choose the option this persona would prefer."
+    )
+
+    payload = {
+        "model": model,
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message},
+        ],
+    }
+
+    req = urllib_request.Request(
+        f"{api_base}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=60) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as err:
+        details = err.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"LLM request failed ({err.code}): {details[:200]}") from err
+    except error.URLError as err:
+        raise RuntimeError(f"LLM request failed: {err.reason}") from err
+
+    content = (
+        result.get("choices", [{}])[0]
+        .get("message", {})
+        .get("content", "")
+    )
+    choice = _extract_choice_from_llm_content(content)
+
+    if choice not in {"A", "B"}:
+        raise RuntimeError(f"LLM returned an invalid choice: {content}")
+
+    return choice
+
+
 @bp.route("/conjoint-surveys", methods=["POST"])
 def create_conjoint_survey():
     data = request.get_json()
@@ -192,12 +342,12 @@ def import_conjoint_survey_dataset():
         "source_file": filename,
     }), 201
 
+
 @bp.route("/conjoint-surveys", methods=["GET"])
 def list_conjoint_surveys():
     surveys = ConjointSurvey.query.all()
 
     result = []
-
     for survey in surveys:
         result.append({
             "id": survey.id,
@@ -206,6 +356,7 @@ def list_conjoint_surveys():
         })
 
     return jsonify(result)
+
 
 @bp.route("/conjoint-surveys/<int:survey_id>", methods=["GET"])
 def get_conjoint_survey(survey_id):
@@ -227,30 +378,128 @@ def get_conjoint_survey(survey_id):
         ]
     })
 
+
+@bp.route("/conjoint-surveys/<int:survey_id>/personas", methods=["GET"])
+def list_conjoint_personas(survey_id):
+    ConjointSurvey.query.get_or_404(survey_id)
+    personas = (
+        ConjointPersona.query
+        .filter(ConjointPersona.survey_id == survey_id)
+        .order_by(ConjointPersona.created_at.desc())
+        .all()
+    )
+    return jsonify([_serialize_persona(persona) for persona in personas])
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>/personas", methods=["POST"])
+def create_conjoint_persona(survey_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    data = request.get_json() or {}
+
+    name = _normalize_text(data.get("name"))
+    attributes = _parse_persona_attributes(data.get("attributes"))
+
+    if not name:
+        return jsonify({"error": "Persona name is required."}), 400
+    if not attributes:
+        return jsonify({"error": "Persona attributes are required."}), 400
+
+    persona = ConjointPersona(
+        survey_id=survey.id,
+        name=name,
+        attributes=attributes,
+    )
+    db.session.add(persona)
+    db.session.commit()
+
+    return jsonify(_serialize_persona(persona)), 201
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>/personas/<int:persona_id>/run", methods=["POST"])
+def run_persona_simulation(survey_id, persona_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    persona = ConjointPersona.query.get_or_404(persona_id)
+
+    if persona.survey_id != survey.id:
+        return jsonify({"error": "Persona does not belong to this survey."}), 400
+
+    payload = request.get_json() or {}
+    num_tasks = payload.get("num_tasks", 8)
+
+    try:
+        num_tasks = int(num_tasks)
+    except (TypeError, ValueError):
+        return jsonify({"error": "num_tasks must be an integer."}), 400
+
+    if num_tasks < 1 or num_tasks > 50:
+        return jsonify({"error": "num_tasks must be between 1 and 50."}), 400
+
+    respondent = ConjointRespondent(
+        survey_id=survey.id,
+        source="llm",
+        persona_id=persona.id,
+    )
+    db.session.add(respondent)
+    db.session.flush()
+
+    try:
+        for task_number in range(1, num_tasks + 1):
+            option_a, option_b = _generate_task_options(survey.attributes)
+            chosen_option = _call_llm_choice(
+                survey=survey,
+                persona=persona,
+                task_number=task_number,
+                option_a=option_a,
+                option_b=option_b,
+            )
+
+            db.session.add(
+                ConjointChoice(
+                    respondent_id=respondent.id,
+                    task_number=task_number,
+                    option_a=option_a,
+                    option_b=option_b,
+                    chosen_option=chosen_option,
+                )
+            )
+    except RuntimeError as err:
+        db.session.rollback()
+        return jsonify({"error": str(err)}), 502
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Persona simulation completed.",
+        "respondent_id": respondent.id,
+        "survey_id": survey.id,
+        "persona": _serialize_persona(persona),
+        "tasks": num_tasks,
+    }), 201
+
+
 @bp.route("/conjoint-surveys/<int:survey_id>/submit", methods=["POST"])
 def submit_conjoint_response(survey_id):
     data = request.get_json()
-
     survey = ConjointSurvey.query.get_or_404(survey_id)
 
     responses = data.get("responses", [])
-
     if not responses:
         return jsonify({"error": "No responses provided"}), 400
 
-    respondent = ConjointRespondent(survey_id=survey.id)
+    respondent = ConjointRespondent(survey_id=survey.id, source="human")
     db.session.add(respondent)
-    db.session.flush()  # get respondent.id before commit
+    db.session.flush()
 
     for task in responses:
-        choice = ConjointChoice(
-            respondent_id=respondent.id,
-            task_number=task["task"],
-            option_a=task["optionA"],
-            option_b=task["optionB"],
-            chosen_option=task["chosen"]
+        db.session.add(
+            ConjointChoice(
+                respondent_id=respondent.id,
+                task_number=task["task"],
+                option_a=task["optionA"],
+                option_b=task["optionB"],
+                chosen_option=task["chosen"],
+            )
         )
-        db.session.add(choice)
 
     db.session.commit()
 
@@ -264,21 +513,45 @@ def submit_conjoint_response(survey_id):
 def estimate_conjoint_survey(survey_id):
     survey = ConjointSurvey.query.get_or_404(survey_id)
 
-    choices = (
+    source = _normalize_text(request.args.get("source", "all")) or "all"
+    source = source.lower()
+    if source not in {"all", "human", "llm"}:
+        return jsonify({"error": "source must be one of: all, human, llm"}), 400
+
+    persona_id = request.args.get("persona_id")
+    persona_id_int = None
+    if persona_id is not None and str(persona_id).strip() != "":
+        try:
+            persona_id_int = int(persona_id)
+        except ValueError:
+            return jsonify({"error": "persona_id must be an integer."}), 400
+
+    respondent_query = (
+        ConjointRespondent.query
+        .filter(ConjointRespondent.survey_id == survey.id)
+    )
+    if source != "all":
+        respondent_query = respondent_query.filter(ConjointRespondent.source == source)
+    if persona_id_int is not None:
+        respondent_query = respondent_query.filter(ConjointRespondent.persona_id == persona_id_int)
+
+    choices_query = (
         ConjointChoice.query
         .join(ConjointRespondent, ConjointChoice.respondent_id == ConjointRespondent.id)
         .filter(ConjointRespondent.survey_id == survey.id)
-        .all()
     )
+    if source != "all":
+        choices_query = choices_query.filter(ConjointRespondent.source == source)
+    if persona_id_int is not None:
+        choices_query = choices_query.filter(ConjointRespondent.persona_id == persona_id_int)
 
+    choices = choices_query.all()
     if not choices:
         return jsonify({"error": "No responses available for analysis"}), 400
 
-    # Track win-rate for each level across all shown profiles.
     level_stats = defaultdict(lambda: {"wins": 0, "appearances": 0})
     task_choice_stats = defaultdict(lambda: {"A": 0, "B": 0, "total": 0})
 
-    # Pre-seed known levels so all survey levels are present in the output.
     for attribute in survey.attributes:
         for level in attribute.levels:
             _ = level_stats[(attribute.name, level.value)]
@@ -310,7 +583,6 @@ def estimate_conjoint_survey(survey_id):
             if appearances == 0:
                 raw_scores.append(0.0)
             else:
-                # Positive means selected more often than chance for this level.
                 raw_scores.append((stats["wins"] / appearances) - 0.5)
 
         mean_score = sum(raw_scores) / len(raw_scores) if raw_scores else 0.0
@@ -387,7 +659,7 @@ def estimate_conjoint_survey(survey_id):
 
     return jsonify({
         "survey_id": survey.id,
-        "respondents": len(survey.respondents),
+        "respondents": respondent_query.count(),
         "tasks_analyzed": len(choices),
         "importance": importance,
         "utilities": utilities,
@@ -397,5 +669,9 @@ def estimate_conjoint_survey(survey_id):
             "hit_rate_pct": hit_rate,
             "evaluated_tasks": evaluated_tasks,
             "ties": ties,
+        },
+        "filter": {
+            "source": source,
+            "persona_id": persona_id_int,
         },
     })

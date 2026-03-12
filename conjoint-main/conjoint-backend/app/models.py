@@ -75,6 +75,12 @@ class ConjointSurvey(db.Model):
         cascade="all, delete-orphan"
     )
 
+    personas = db.relationship(
+        "ConjointPersona",
+        back_populates="survey",
+        cascade="all, delete-orphan"
+    )
+
 
 class ConjointAttribute(db.Model):
     __tablename__ = "conjoint_attribute"
@@ -121,16 +127,40 @@ class ConjointRespondent(db.Model):
         db.ForeignKey("conjoint_survey.id"),
         nullable=False
     )
+    source = db.Column(db.String(20), nullable=False, default="human")
+    persona_id = db.Column(
+        db.Integer,
+        db.ForeignKey("conjoint_persona.id"),
+        nullable=True
+    )
 
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     survey = db.relationship("ConjointSurvey", back_populates="respondents")
+    persona = db.relationship("ConjointPersona", back_populates="respondents")
 
     choices = db.relationship(
         "ConjointChoice",
         back_populates="respondent",
         cascade="all, delete-orphan"
     )
+
+
+class ConjointPersona(db.Model):
+    __tablename__ = "conjoint_persona"
+
+    id = db.Column(db.Integer, primary_key=True)
+    survey_id = db.Column(
+        db.Integer,
+        db.ForeignKey("conjoint_survey.id"),
+        nullable=False
+    )
+    name = db.Column(db.String(255), nullable=False)
+    attributes = db.Column(db.JSON, nullable=False, default=dict)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    survey = db.relationship("ConjointSurvey", back_populates="personas")
+    respondents = db.relationship("ConjointRespondent", back_populates="persona")
 
 
 class ConjointChoice(db.Model):

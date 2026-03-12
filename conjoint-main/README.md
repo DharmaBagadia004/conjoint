@@ -34,3 +34,28 @@ JSON example (array of profiles):
   { "Price": "High", "Battery": "20h", "Brand": "Gamma" }
 ]
 ```
+
+## Persona + LLM Simulation
+
+You can now define personas and let an LLM take the conjoint survey on behalf of each persona.
+
+### Environment variables (backend)
+
+- `OPENAI_API_KEY` (required for persona simulation)
+- `OPENAI_MODEL` (optional, default: `gpt-4o-mini`)
+- `OPENAI_API_BASE` (optional, default: `https://api.openai.com/v1`)
+### Flow
+
+1. Open a survey from Dashboard using **Run Persona**.
+2. Define persona name + key/value attributes (for example, age, budget, risk preference).
+3. Click **Run with LLM**.
+4. Open results with filters:
+   - source: all/human/llm
+   - persona: specific persona (when source=llm)
+
+### API endpoints added
+
+- `GET /api/conjoint-surveys/<survey_id>/personas`
+- `POST /api/conjoint-surveys/<survey_id>/personas`
+- `POST /api/conjoint-surveys/<survey_id>/personas/<persona_id>/run`
+- `GET /api/conjoint-surveys/<survey_id>/estimate?source=llm&persona_id=<id>`

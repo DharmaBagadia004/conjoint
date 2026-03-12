@@ -76,12 +76,19 @@ function Dashboard() {
             Created {new Date(survey.created_at).toLocaleDateString()}
           </p>
 
-          <div className="mt-8 flex justify-between">
+          <div className="mt-8 flex justify-between gap-3">
             <button
               onClick={() => navigate(`/run/${survey.id}`)}
               className="text-indigo-600 text-sm font-medium hover:underline"
             >
               Run Survey
+            </button>
+
+            <button
+              onClick={() => navigate(`/personas/${survey.id}`)}
+              className="text-emerald-600 text-sm font-medium hover:underline"
+            >
+              Run Persona
             </button>
 
             <button

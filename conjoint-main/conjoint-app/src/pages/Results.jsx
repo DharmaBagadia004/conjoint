@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import {
   BarChart,
@@ -21,24 +21,42 @@ const shortenLabel = (value, max = 28) => {
 
 function Results() {
   const { id } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [survey, setSurvey] = useState(null);
   const [analysis, setAnalysis] = useState(null);
+  const [personas, setPersonas] = useState([]);
   const [error, setError] = useState("");
   const [selectedAttribute, setSelectedAttribute] = useState("");
+
+  const sourceFilter = searchParams.get("source") || "all";
+  const personaFilter = searchParams.get("persona_id") || "";
 
   useEffect(() => {
     const fetchResults = async () => {
       try {
+        setError("");
+
         const surveyRes = await axios.get(
           `http://localhost:5000/api/conjoint-surveys/${id}`
         );
         setSurvey(surveyRes.data);
 
         const estimateRes = await axios.get(
-          `http://localhost:5000/api/conjoint-surveys/${id}/estimate`
+          `http://localhost:5000/api/conjoint-surveys/${id}/estimate`,
+          {
+            params: {
+              source: sourceFilter,
+              ...(personaFilter ? { persona_id: personaFilter } : {})
+            }
+          }
         );
         setAnalysis(estimateRes.data);
+
+        const personasRes = await axios.get(
+          `http://localhost:5000/api/conjoint-surveys/${id}/personas`
+        );
+        setPersonas(personasRes.data);
       } catch (err) {
         console.error(err);
         setError(
@@ -49,7 +67,21 @@ function Results() {
     };
 
     fetchResults();
-  }, [id]);
+  }, [id, sourceFilter, personaFilter]);
+
+  const updateFilters = (nextSource, nextPersona = "") => {
+    const params = new URLSearchParams();
+
+    if (nextSource && nextSource !== "all") {
+      params.set("source", nextSource);
+    }
+
+    if (nextSource === "llm" && nextPersona) {
+      params.set("persona_id", nextPersona);
+    }
+
+    setSearchParams(params);
+  };
 
   if (error) {
     return (
@@ -161,6 +193,48 @@ function Results() {
           <p className="text-2xl font-semibold text-gray-900 mt-2">
             {modelFit.hit_rate_pct}%
           </p>
+        </div>
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-12">
+        <h2 className="text-sm font-semibold text-gray-900 mb-3">
+          Result Filters
+        </h2>
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Source
+            </label>
+            <select
+              value={sourceFilter}
+              onChange={(e) => updateFilters(e.target.value, "")}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Respondents</option>
+              <option value="human">Human Only</option>
+              <option value="llm">LLM Only</option>
+            </select>
+          </div>
+
+          {sourceFilter === "llm" && (
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">
+                Persona
+              </label>
+              <select
+                value={personaFilter}
+                onChange={(e) => updateFilters("llm", e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">All Personas</option>
+                {personas.map((persona) => (
+                  <option key={persona.id} value={persona.id}>
+                    {persona.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,0 +1,25 @@
+{
+  "title": "Laptop Purchase Study",
+  "attributes": [
+    {
+      "name": "price",
+      "levels": [{"value": "$799"}, {"value": "$1099"}, {"value": "$1399"}]
+    },
+    {
+      "name": "battery life",
+      "levels": [{"value": "10 hours"}, {"value": "14 hours"}, {"value": "18 hours"}]
+    },
+    {
+      "name": "weight",
+      "levels": [{"value": "1.2 kg"}, {"value": "1.5 kg"}, {"value": "1.9 kg"}]
+    },
+    {
+      "name": "storage",
+      "levels": [{"value": "256 GB"}, {"value": "512 GB"}, {"value": "1 TB"}]
+    },
+    {
+      "name": "support",
+      "levels": [{"value": "Standard"}, {"value": "Priority"}, {"value": "On-site"}]
+    }
+  ]
+}

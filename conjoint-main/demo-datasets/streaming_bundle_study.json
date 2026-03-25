@@ -1,0 +1,25 @@
+{
+  "title": "Streaming Bundle Study",
+  "attributes": [
+    {
+      "name": "monthly price",
+      "levels": [{"value": "$9"}, {"value": "$15"}, {"value": "$21"}]
+    },
+    {
+      "name": "ads",
+      "levels": [{"value": "Heavy"}, {"value": "Light"}, {"value": "None"}]
+    },
+    {
+      "name": "sports access",
+      "levels": [{"value": "None"}, {"value": "Highlights"}, {"value": "Live Sports"}]
+    },
+    {
+      "name": "downloads",
+      "levels": [{"value": "1 device"}, {"value": "3 devices"}, {"value": "Unlimited"}]
+    },
+    {
+      "name": "simultaneous screens",
+      "levels": [{"value": "1"}, {"value": "2"}, {"value": "4"}]
+    }
+  ]
+}

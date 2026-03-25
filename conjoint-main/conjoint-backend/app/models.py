@@ -160,7 +160,11 @@ class ConjointPersona(db.Model):
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     survey = db.relationship("ConjointSurvey", back_populates="personas")
-    respondents = db.relationship("ConjointRespondent", back_populates="persona")
+    respondents = db.relationship(
+        "ConjointRespondent",
+        back_populates="persona",
+        cascade="all, delete-orphan"
+    )
 
 
 class ConjointChoice(db.Model):

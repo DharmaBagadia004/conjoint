@@ -1,0 +1,25 @@
+{
+  "title": "Travel Backpack Study",
+  "attributes": [
+    {
+      "name": "price",
+      "levels": [{"value": "$79"}, {"value": "$119"}, {"value": "$159"}]
+    },
+    {
+      "name": "capacity",
+      "levels": [{"value": "22 L"}, {"value": "30 L"}, {"value": "40 L"}]
+    },
+    {
+      "name": "weight",
+      "levels": [{"value": "0.9 kg"}, {"value": "1.2 kg"}, {"value": "1.6 kg"}]
+    },
+    {
+      "name": "laptop sleeve",
+      "levels": [{"value": "No"}, {"value": "15 inch"}, {"value": "17 inch"}]
+    },
+    {
+      "name": "material",
+      "levels": [{"value": "Polyester"}, {"value": "Recycled Nylon"}, {"value": "Waterproof Canvas"}]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "title": "Meal Kit Subscription Study",
+  "attributes": [
+    {
+      "name": "price per serving",
+      "levels": [{"value": "$8"}, {"value": "$11"}, {"value": "$14"}]
+    },
+    {
+      "name": "prep time",
+      "levels": [{"value": "15 min"}, {"value": "25 min"}, {"value": "40 min"}]
+    },
+    {
+      "name": "menu variety",
+      "levels": [{"value": "8 meals"}, {"value": "14 meals"}, {"value": "20 meals"}]
+    },
+    {
+      "name": "dietary support",
+      "levels": [{"value": "Standard"}, {"value": "Vegetarian"}, {"value": "Vegetarian + High Protein"}]
+    },
+    {
+      "name": "delivery flexibility",
+      "levels": [{"value": "Fixed"}, {"value": "Skip Anytime"}, {"value": "Pause + Skip Anytime"}]
+    }
+  ]
+}

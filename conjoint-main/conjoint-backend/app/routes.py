@@ -379,6 +379,44 @@ def get_conjoint_survey(survey_id):
     })
 
 
+@bp.route("/conjoint-surveys/<int:survey_id>", methods=["DELETE"])
+def delete_conjoint_survey(survey_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+
+    try:
+        respondents = (
+            ConjointRespondent.query
+            .filter(ConjointRespondent.survey_id == survey.id)
+            .all()
+        )
+        for respondent in respondents:
+            db.session.delete(respondent)
+
+        personas = (
+            ConjointPersona.query
+            .filter(ConjointPersona.survey_id == survey.id)
+            .all()
+        )
+        for persona in personas:
+            db.session.delete(persona)
+
+        attributes = (
+            ConjointAttribute.query
+            .filter(ConjointAttribute.survey_id == survey.id)
+            .all()
+        )
+        for attribute in attributes:
+            db.session.delete(attribute)
+
+        db.session.delete(survey)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Unable to delete survey."}), 500
+
+    return jsonify({"message": "Survey deleted successfully."})
+
+
 @bp.route("/conjoint-surveys/<int:survey_id>/personas", methods=["GET"])
 def list_conjoint_personas(survey_id):
     ConjointSurvey.query.get_or_404(survey_id)
@@ -475,6 +513,27 @@ def run_persona_simulation(survey_id, persona_id):
         "persona": _serialize_persona(persona),
         "tasks": num_tasks,
     }), 201
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>/personas/<int:persona_id>", methods=["DELETE"])
+def delete_conjoint_persona(survey_id, persona_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    persona = ConjointPersona.query.get_or_404(persona_id)
+
+    if persona.survey_id != survey.id:
+        return jsonify({"error": "Persona does not belong to this survey."}), 400
+
+    try:
+        for respondent in list(persona.respondents):
+            db.session.delete(respondent)
+
+        db.session.delete(persona)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({"error": "Unable to delete persona."}), 500
+
+    return jsonify({"message": "Persona deleted successfully."})
 
 
 @bp.route("/conjoint-surveys/<int:survey_id>/submit", methods=["POST"])

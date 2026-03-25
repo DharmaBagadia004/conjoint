@@ -4,6 +4,7 @@ import CreateSurvey from "./pages/CreateSurvey";
 import RunSurvey from "./pages/RunSurvey";
 import Results from "./pages/Results";
 import PersonaRunner from "./pages/PersonaRunner";
+import SurveyDetails from "./pages/SurveyDetails";
 import Layout from "./components/Layout";
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout><Dashboard /></Layout>} />
         <Route path="/create" element={<Layout><CreateSurvey /></Layout>} />
+        <Route path="/surveys/:id" element={<Layout><SurveyDetails /></Layout>} />
         <Route path="/run/:id" element={<Layout><RunSurvey /></Layout>} />
         <Route path="/personas/:id" element={<Layout><PersonaRunner /></Layout>} />
         <Route path="/results/:id" element={<Layout><Results /></Layout>} />

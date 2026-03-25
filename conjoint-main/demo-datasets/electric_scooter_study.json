@@ -1,0 +1,25 @@
+{
+  "title": "Electric Scooter Study",
+  "attributes": [
+    {
+      "name": "price",
+      "levels": [{"value": "$499"}, {"value": "$699"}, {"value": "$899"}]
+    },
+    {
+      "name": "range",
+      "levels": [{"value": "20 km"}, {"value": "35 km"}, {"value": "50 km"}]
+    },
+    {
+      "name": "charge time",
+      "levels": [{"value": "3 hours"}, {"value": "5 hours"}, {"value": "7 hours"}]
+    },
+    {
+      "name": "weight",
+      "levels": [{"value": "12 kg"}, {"value": "15 kg"}, {"value": "18 kg"}]
+    },
+    {
+      "name": "safety package",
+      "levels": [{"value": "Basic"}, {"value": "Dual Brake"}, {"value": "Dual Brake + Lights"}]
+    }
+  ]
+}

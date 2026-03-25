@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
 function Dashboard() {
   const navigate = useNavigate();
   const [surveys, setSurveys] = useState([]);
+  const [deletingSurveyId, setDeletingSurveyId] = useState(null);
 
-  useEffect(() => {
-  const fetchSurveys = async () => {
+  const fetchSurveys = useCallback(async () => {
     try {
       const res = await axios.get(
         "http://localhost:5000/api/conjoint-surveys"
@@ -16,10 +16,33 @@ function Dashboard() {
     } catch (err) {
       console.error(err);
     }
-  };
+  }, []);
 
+  useEffect(() => {
   fetchSurveys();
-}, []);
+}, [fetchSurveys]);
+
+  const deleteSurvey = async (survey) => {
+    const confirmed = window.confirm(
+      `Delete survey "${survey.title}"?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingSurveyId(survey.id);
+      await axios.delete(
+        `http://localhost:5000/api/conjoint-surveys/${survey.id}`
+      );
+      await fetchSurveys();
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.error || "Unable to delete survey.");
+    } finally {
+      setDeletingSurveyId(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -64,36 +87,72 @@ function Dashboard() {
       {surveys.map((survey) => (
         <div
           key={survey.id}
-          className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition duration-200"
+          onClick={() => navigate(`/surveys/${survey.id}`)}
+          className="group relative bg-white border border-slate-200 rounded-3xl p-6 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition duration-200"
         >
-          <div className="flex justify-between items-start">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteSurvey(survey);
+            }}
+            disabled={deletingSurveyId === survey.id}
+            className="absolute right-4 top-4 z-10 rounded-full border border-transparent bg-white/90 p-2 text-slate-400 shadow-sm opacity-0 ring-1 ring-slate-200 backdrop-blur transition hover:border-red-100 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-60"
+            aria-label={`Delete survey ${survey.title}`}
+            title="Delete survey"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="h-4 w-4"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10 11v6" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14 11v6" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+            </svg>
+          </button>
+
+          <div className="pr-10">
             <h2 className="text-lg font-semibold text-gray-900">
               {survey.title}
             </h2>
           </div>
 
-          <p className="text-sm text-gray-500 mt-3">
+          <p className="text-sm text-slate-500 mt-3">
             Created {new Date(survey.created_at).toLocaleDateString()}
           </p>
 
-          <div className="mt-8 flex justify-between gap-3">
+          <div className="mt-8 flex flex-wrap gap-3">
             <button
-              onClick={() => navigate(`/run/${survey.id}`)}
-              className="text-indigo-600 text-sm font-medium hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/run/${survey.id}`);
+              }}
+              className="rounded-full bg-indigo-50 px-3 py-1.5 text-indigo-700 text-sm font-medium transition hover:bg-indigo-100"
             >
               Run Survey
             </button>
 
             <button
-              onClick={() => navigate(`/personas/${survey.id}`)}
-              className="text-emerald-600 text-sm font-medium hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/personas/${survey.id}`);
+              }}
+              className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-700 text-sm font-medium transition hover:bg-emerald-100"
             >
               Run Persona
             </button>
 
             <button
-              onClick={() => navigate(`/results/${survey.id}`)}
-              className="text-gray-600 text-sm font-medium hover:underline"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/results/${survey.id}`);
+              }}
+              className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700 text-sm font-medium transition hover:bg-slate-200"
             >
               View Results
             </button>

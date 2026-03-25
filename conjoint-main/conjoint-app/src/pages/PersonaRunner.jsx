@@ -123,6 +123,25 @@ function PersonaRunner() {
     }
   };
 
+  const deletePersona = async (persona) => {
+    const confirmed = window.confirm(
+      `Delete persona "${persona.name}"?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `http://localhost:5000/api/conjoint-surveys/${id}/personas/${persona.id}`
+      );
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      alert(error?.response?.data?.error || "Unable to delete persona.");
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -235,9 +254,32 @@ function PersonaRunner() {
               {personas.map((persona) => (
                 <div
                   key={persona.id}
-                  className="border border-gray-200 rounded-xl p-4"
+                  className="relative border border-gray-200 rounded-xl p-4"
                 >
-                  <div className="flex justify-between items-start gap-4">
+                  <button
+                    onClick={() => deletePersona(persona)}
+                    disabled={runningPersonaId === persona.id}
+                    className="absolute right-4 top-4 rounded-full p-2 text-red-500 hover:bg-red-50 hover:text-red-600 transition disabled:opacity-60"
+                    aria-label={`Delete persona ${persona.name}`}
+                    title="Delete persona"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      className="h-4 w-4"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 7h16" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 11v6" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 11v6" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3" />
+                    </svg>
+                  </button>
+
+                  <div className="flex justify-between items-start gap-4 pr-10">
                     <div>
                       <h3 className="text-sm font-semibold text-gray-900">
                         {persona.name}

@@ -5,6 +5,7 @@ import os
 import random
 import re
 from collections import defaultdict
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from urllib import error, request as urllib_request
 
@@ -23,11 +24,338 @@ from .models import (
 bp = Blueprint("api", __name__, url_prefix="/api")
 
 
+DESCENDING_PRICE_HINTS = ("weight", "charge time", "prep time", "ads", "housingcost", "classsize")
+DEFAULT_PRICE_CONFIGS = {
+    "laptop purchase study": {
+        "battery life": 0.30,
+        "weight": 0.20,
+        "storage": 0.25,
+        "support": 0.25,
+    },
+    "electric scooter study": {
+        "range": 0.35,
+        "charge time": 0.20,
+        "weight": 0.15,
+        "safety package": 0.30,
+    },
+    "meal kit subscription study": {
+        "prep time": 0.25,
+        "menu variety": 0.20,
+        "dietary support": 0.30,
+        "delivery flexibility": 0.25,
+    },
+    "travel backpack study": {
+        "capacity": 0.30,
+        "weight": 0.20,
+        "laptop sleeve": 0.20,
+        "material": 0.30,
+    },
+    "streaming bundle study": {
+        "ads": 0.30,
+        "sports access": 0.30,
+        "downloads": 0.20,
+        "simultaneous screens": 0.20,
+    },
+    "university": {
+        "Ranking": 0.22,
+        "Placement": 0.18,
+        "Internships": 0.08,
+        "ClassSize": 0.08,
+        "Research": 0.12,
+        "CampusLife": 0.07,
+        "Diversity": 0.07,
+        "HousingCost": 0.10,
+        "Scholarship": 0.08,
+    },
+}
+
+
 def _normalize_text(value):
     if value is None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _normalize_key(value):
+    text = _normalize_text(value)
+    return text.lower() if text else None
+
+
+def _is_price_attribute(name):
+    normalized_name = _normalize_key(name) or ""
+    return (
+        "price" in normalized_name
+        or "tuition" in normalized_name
+        or "cost" == normalized_name
+    )
+
+
+def _parse_price_value(value):
+    if value is None:
+        return None
+
+    text = str(value).strip()
+    cleaned = re.sub(r"[^0-9.\-]", "", text)
+    if not cleaned:
+        return None
+
+    try:
+        return Decimal(cleaned)
+    except InvalidOperation:
+        return None
+
+
+def _format_price_value(value, template_levels=None):
+    if value is None:
+        return None
+
+    quantized = value.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    if template_levels and any("$" in str(level) for level in template_levels):
+        return f"${int(quantized)}"
+    return str(int(quantized))
+
+
+def _find_price_attribute(attributes):
+    for attr in attributes:
+        if _is_price_attribute(attr.name):
+            return attr
+    return None
+
+
+def _price_direction_for_attribute(name):
+    normalized_name = _normalize_key(name) or ""
+    if any(hint in normalized_name for hint in DESCENDING_PRICE_HINTS):
+        return "descending"
+    return "ascending"
+
+
+def _extract_attribute_levels(attribute):
+    return [level.value for level in attribute.levels]
+
+
+def _build_default_price_weights(attributes, price_attribute_name):
+    non_price_attributes = [
+        attr for attr in attributes
+        if _normalize_key(attr.name) != _normalize_key(price_attribute_name)
+    ]
+    if not non_price_attributes:
+        return {}
+
+    equal_weight = 1 / len(non_price_attributes)
+    return {attr.name: equal_weight for attr in non_price_attributes}
+
+
+def _normalize_component_weights(components):
+    included_components = [
+        component for component in components
+        if component.get("included", True)
+    ]
+    if not included_components:
+        return components
+
+    positive_total = sum(
+        max(float(component.get("weight", 0) or 0), 0.0)
+        for component in included_components
+    )
+
+    if positive_total <= 0:
+        default_weight = 1 / len(included_components)
+        for component in included_components:
+            component["weight"] = default_weight
+    else:
+        for component in included_components:
+            component["weight"] = max(float(component.get("weight", 0) or 0), 0.0) / positive_total
+
+    for component in components:
+        if not component.get("included", True):
+            component["weight"] = 0.0
+
+    return components
+
+
+def _default_price_config_for_survey(survey, attributes):
+    price_attribute = _find_price_attribute(attributes)
+    if not price_attribute:
+        return None
+
+    survey_key = _normalize_key(survey.title) or ""
+    configured_weights = DEFAULT_PRICE_CONFIGS.get(survey_key)
+    if not configured_weights:
+        configured_weights = _build_default_price_weights(attributes, price_attribute.name)
+
+    components = []
+    for attr in attributes:
+        if _normalize_key(attr.name) == _normalize_key(price_attribute.name):
+            continue
+
+        levels = _extract_attribute_levels(attr)
+        if len(levels) < 2:
+            continue
+
+        weight = configured_weights.get(attr.name)
+        if weight is None:
+            continue
+
+        components.append({
+            "attribute": attr.name,
+            "weight": float(weight),
+            "included": True,
+            "direction": _price_direction_for_attribute(attr.name),
+        })
+
+    if not components:
+        return None
+
+    return {
+        "price_attribute": price_attribute.name,
+        "components": _normalize_component_weights(components),
+    }
+
+
+def _merged_price_config(survey, attributes):
+    default_config = _default_price_config_for_survey(survey, attributes)
+    if not default_config:
+        return None
+
+    stored_config = survey.price_config if isinstance(survey.price_config, dict) else {}
+    stored_components = {
+        _normalize_key(component.get("attribute")): component
+        for component in stored_config.get("components", [])
+        if isinstance(component, dict) and _normalize_text(component.get("attribute"))
+    }
+
+    merged_components = []
+    for component in default_config["components"]:
+        stored_component = stored_components.get(_normalize_key(component["attribute"]), {})
+        merged_components.append({
+            "attribute": component["attribute"],
+            "weight": stored_component.get("weight", component["weight"]),
+            "included": stored_component.get("included", component["included"]),
+            "direction": stored_component.get("direction", component["direction"]),
+        })
+
+    return {
+        "price_attribute": stored_config.get("price_attribute", default_config["price_attribute"]),
+        "components": _normalize_component_weights(merged_components),
+    }
+
+
+def _build_price_formula(survey, attributes):
+    price_config = _merged_price_config(survey, attributes)
+    if not price_config:
+        return None
+
+    price_attribute = _find_price_attribute(attributes)
+    if not price_attribute:
+        return None
+
+    price_levels = [
+        _parse_price_value(level.value)
+        for level in price_attribute.levels
+    ]
+    numeric_price_levels = [level for level in price_levels if level is not None]
+    if len(numeric_price_levels) < 2:
+        return None
+    price_level_labels = _extract_attribute_levels(price_attribute)
+
+    attribute_lookup = {attr.name: attr for attr in attributes}
+    included_components = []
+    for component in price_config["components"]:
+        if not component.get("included", True):
+            continue
+        attribute = attribute_lookup.get(component["attribute"])
+        if not attribute:
+            continue
+        levels = _extract_attribute_levels(attribute)
+        if len(levels) < 2:
+            continue
+        included_components.append({
+            "attribute": component["attribute"],
+            "weight": float(component["weight"]),
+            "included": True,
+            "direction": component["direction"],
+            "levels": levels,
+        })
+
+    if not included_components:
+        return None
+
+    min_price = min(numeric_price_levels)
+    max_price = max(numeric_price_levels)
+    equation = (
+        f"{price_attribute.name} = min_price + (max_price - min_price) x "
+        "weighted_feature_score, where weighted_feature_score = "
+        "sum(weight x normalized_level_score) / sum(weight)"
+    )
+
+    display_terms = [
+        f"{component['weight']:.2f} x {component['attribute']} ({component['direction']})"
+        for component in included_components
+    ]
+
+    return {
+        "price_attribute": price_attribute.name,
+        "min_price": _format_price_value(min_price, price_level_labels),
+        "max_price": _format_price_value(max_price, price_level_labels),
+        "components": [
+            {
+                "attribute": component["attribute"],
+                "weight": component["weight"],
+                "included": True,
+                "direction": component["direction"],
+            }
+            for component in price_config["components"]
+        ],
+        "equation": equation,
+        "display_equation": (
+            f"{price_attribute.name} = { _format_price_value(min_price, price_level_labels) } + "
+            f"({ _format_price_value(max_price, price_level_labels) } - { _format_price_value(min_price, price_level_labels) }) x "
+            f"[({ ' + '.join(display_terms) }) / 1.00]"
+        ),
+        "active_components": included_components,
+        "price_level_labels": price_level_labels,
+    }
+
+
+def _normalized_level_score(levels, selected_level, direction):
+    if len(levels) <= 1:
+        return 0.0
+
+    try:
+        index = levels.index(selected_level)
+    except ValueError:
+        index = 0
+
+    raw_score = index / (len(levels) - 1)
+    if direction == "descending":
+        raw_score = 1 - raw_score
+    return raw_score
+
+
+def _compute_price_from_formula(profile, formula):
+    components = formula.get("active_components", [])
+    numerator = 0.0
+    denominator = 0.0
+
+    for component in components:
+        selected_level = profile.get(component["attribute"])
+        score = _normalized_level_score(
+            component["levels"],
+            selected_level,
+            component["direction"],
+        )
+        numerator += component["weight"] * score
+        denominator += component["weight"]
+
+    weighted_score = numerator / denominator if denominator else 0.0
+    min_price = _parse_price_value(formula["min_price"])
+    max_price = _parse_price_value(formula["max_price"])
+    if min_price is None or max_price is None:
+        return None
+
+    computed_price = min_price + (max_price - min_price) * Decimal(str(weighted_score))
+    return _format_price_value(computed_price, formula.get("price_level_labels"))
 
 
 def _parse_persona_attributes(raw_attributes):
@@ -175,9 +503,12 @@ def _parse_json_dataset(raw_bytes):
     )
 
 
-def _generate_random_profile(attributes):
+def _generate_random_profile(attributes, exclude_names=None):
+    exclude_keys = {_normalize_key(name) for name in (exclude_names or [])}
     profile = {}
     for attr in attributes:
+        if _normalize_key(attr.name) in exclude_keys:
+            continue
         levels = [level.value for level in attr.levels]
         if not levels:
             continue
@@ -185,13 +516,23 @@ def _generate_random_profile(attributes):
     return profile
 
 
-def _generate_task_options(attributes):
-    option_a = _generate_random_profile(attributes)
-    option_b = _generate_random_profile(attributes)
+def _generate_task_options(survey, attributes):
+    formula = _build_price_formula(survey, attributes)
+    price_attribute_name = formula["price_attribute"] if formula else None
+
+    option_a = _generate_random_profile(attributes, exclude_names=[price_attribute_name] if price_attribute_name else None)
+    option_b = _generate_random_profile(attributes, exclude_names=[price_attribute_name] if price_attribute_name else None)
+
+    if formula and price_attribute_name:
+        option_a[price_attribute_name] = _compute_price_from_formula(option_a, formula)
+        option_b[price_attribute_name] = _compute_price_from_formula(option_b, formula)
+
     attempts = 0
 
     while option_a == option_b and attempts < 10:
-        option_b = _generate_random_profile(attributes)
+        option_b = _generate_random_profile(attributes, exclude_names=[price_attribute_name] if price_attribute_name else None)
+        if formula and price_attribute_name:
+            option_b[price_attribute_name] = _compute_price_from_formula(option_b, formula)
         attempts += 1
 
     return option_a, option_b
@@ -217,6 +558,28 @@ def _extract_choice_from_llm_content(content):
         return match.group(1)
 
     return None
+
+
+def _serialize_price_formula(price_formula):
+    if not price_formula:
+        return None
+
+    return {
+        "price_attribute": price_formula["price_attribute"],
+        "min_price": price_formula["min_price"],
+        "max_price": price_formula["max_price"],
+        "equation": price_formula["equation"],
+        "display_equation": price_formula["display_equation"],
+        "components": [
+            {
+                "attribute": component["attribute"],
+                "weight": round(float(component["weight"]), 4),
+                "included": bool(component.get("included", True)),
+                "direction": component["direction"],
+            }
+            for component in price_formula["components"]
+        ],
+    }
 
 
 def _call_llm_choice(survey, persona, task_number, option_a, option_b):
@@ -361,10 +724,12 @@ def list_conjoint_surveys():
 @bp.route("/conjoint-surveys/<int:survey_id>", methods=["GET"])
 def get_conjoint_survey(survey_id):
     survey = ConjointSurvey.query.get_or_404(survey_id)
+    price_formula = _build_price_formula(survey, survey.attributes)
 
     return jsonify({
         "id": survey.id,
         "title": survey.title,
+        "price_formula": _serialize_price_formula(price_formula),
         "attributes": [
             {
                 "id": attr.id,
@@ -376,6 +741,90 @@ def get_conjoint_survey(survey_id):
             }
             for attr in survey.attributes
         ]
+    })
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>/task", methods=["GET"])
+def generate_conjoint_task(survey_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    option_a, option_b = _generate_task_options(survey, survey.attributes)
+    return jsonify({
+        "optionA": option_a,
+        "optionB": option_b,
+    })
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>/price-config", methods=["PATCH"])
+def update_conjoint_price_config(survey_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    payload = request.get_json() or {}
+    components = payload.get("components")
+
+    if not isinstance(components, list):
+        return jsonify({"error": "components must be a list."}), 400
+
+    default_config = _default_price_config_for_survey(survey, survey.attributes)
+    if not default_config:
+        return jsonify({"error": "This survey does not have a configurable price attribute."}), 400
+
+    default_components = {
+        _normalize_key(component["attribute"]): component
+        for component in default_config["components"]
+    }
+
+    next_components = []
+    for component in components:
+        if not isinstance(component, dict):
+            continue
+
+        attribute_name = _normalize_text(component.get("attribute"))
+        normalized_name = _normalize_key(attribute_name)
+        if not normalized_name or normalized_name not in default_components:
+            continue
+
+        default_component = default_components[normalized_name]
+        next_components.append({
+            "attribute": default_component["attribute"],
+            "weight": component.get("weight", default_component["weight"]),
+            "included": bool(component.get("included", True)),
+            "direction": default_component["direction"],
+        })
+
+    if not next_components:
+        return jsonify({"error": "At least one valid component is required."}), 400
+
+    next_components = _normalize_component_weights(next_components)
+    if not any(component["included"] for component in next_components):
+        return jsonify({"error": "At least one attribute must be included in the price equation."}), 400
+
+    survey.price_config = {
+        "price_attribute": default_config["price_attribute"],
+        "components": next_components,
+    }
+    db.session.commit()
+
+    return jsonify({
+        "survey_id": survey.id,
+        "price_formula": _serialize_price_formula(_build_price_formula(survey, survey.attributes)),
+    })
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>", methods=["PATCH"])
+def update_conjoint_survey(survey_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    data = request.get_json() or {}
+
+    title = _normalize_text(data.get("title"))
+    if not title:
+        return jsonify({"error": "Survey title is required."}), 400
+
+    survey.title = title
+    db.session.commit()
+
+    return jsonify({
+        "id": survey.id,
+        "title": survey.title,
+        "created_at": survey.created_at,
     })
 
 
@@ -482,7 +931,7 @@ def run_persona_simulation(survey_id, persona_id):
 
     try:
         for task_number in range(1, num_tasks + 1):
-            option_a, option_b = _generate_task_options(survey.attributes)
+            option_a, option_b = _generate_task_options(survey, survey.attributes)
             chosen_option = _call_llm_choice(
                 survey=survey,
                 persona=persona,

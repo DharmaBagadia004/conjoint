@@ -6,6 +6,7 @@ function Dashboard() {
   const navigate = useNavigate();
   const [surveys, setSurveys] = useState([]);
   const [deletingSurveyId, setDeletingSurveyId] = useState(null);
+  const [renamingSurveyId, setRenamingSurveyId] = useState(null);
 
   const fetchSurveys = useCallback(async () => {
     try {
@@ -41,6 +42,41 @@ function Dashboard() {
       alert(err?.response?.data?.error || "Unable to delete survey.");
     } finally {
       setDeletingSurveyId(null);
+    }
+  };
+
+  const renameSurvey = async (survey) => {
+    const nextTitle = window.prompt(
+      "Enter a new survey name:",
+      survey.title
+    );
+
+    if (nextTitle === null) {
+      return;
+    }
+
+    const trimmedTitle = nextTitle.trim();
+    if (!trimmedTitle) {
+      alert("Survey name cannot be empty.");
+      return;
+    }
+
+    if (trimmedTitle === survey.title) {
+      return;
+    }
+
+    try {
+      setRenamingSurveyId(survey.id);
+      await axios.patch(
+        `http://localhost:5000/api/conjoint-surveys/${survey.id}`,
+        { title: trimmedTitle }
+      );
+      await fetchSurveys();
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.error || "Unable to rename survey.");
+    } finally {
+      setRenamingSurveyId(null);
     }
   };
 
@@ -93,9 +129,39 @@ function Dashboard() {
           <button
             onClick={(e) => {
               e.stopPropagation();
+              renameSurvey(survey);
+            }}
+            disabled={renamingSurveyId === survey.id}
+            className="absolute right-16 top-4 z-10 rounded-full border border-transparent bg-white/90 p-2 text-slate-400 shadow-sm opacity-0 ring-1 ring-slate-200 backdrop-blur transition hover:border-sky-100 hover:bg-sky-50 hover:text-sky-600 group-hover:opacity-100 disabled:opacity-60"
+            aria-label={`Rename survey ${survey.title}`}
+            title="Rename survey"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              className="h-4 w-4"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.862 3.487a2.25 2.25 0 1 1 3.182 3.182L8.25 18.463 4 19.5l1.037-4.25L16.862 3.487Z"
+              />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 5.25l3.75 3.75" />
+            </svg>
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               deleteSurvey(survey);
             }}
-            disabled={deletingSurveyId === survey.id}
+            disabled={
+              deletingSurveyId === survey.id ||
+              renamingSurveyId === survey.id
+            }
             className="absolute right-4 top-4 z-10 rounded-full border border-transparent bg-white/90 p-2 text-slate-400 shadow-sm opacity-0 ring-1 ring-slate-200 backdrop-blur transition hover:border-red-100 hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 disabled:opacity-60"
             aria-label={`Delete survey ${survey.title}`}
             title="Delete survey"

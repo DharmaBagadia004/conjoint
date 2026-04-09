@@ -14,6 +14,7 @@ function RunSurvey() {
   const [taskNumber, setTaskNumber] = useState(1);
   const [completed, setCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingTask, setIsLoadingTask] = useState(false);
 
 
 useEffect(() => {
@@ -23,7 +24,7 @@ useEffect(() => {
         `http://localhost:5000/api/conjoint-surveys/${id}`
       );
       setSurvey(res.data);
-      generateTask(res.data);
+      await generateTask(id);
     } catch (err) {
       console.error(err);
     }
@@ -32,26 +33,22 @@ useEffect(() => {
   fetchSurvey();
 }, [id]);
 
-  const generateRandomProfile = (attributes) => {
-    const profile = {};
-
-    attributes.forEach(attr => {
-      const randomLevel =
-        attr.levels[Math.floor(Math.random() * attr.levels.length)];
-      profile[attr.name] = randomLevel.value;
-    });
-
-    return profile;
-  };
-
-  const generateTask = (surveyData) => {
-    const optionA = generateRandomProfile(surveyData.attributes);
-    const optionB = generateRandomProfile(surveyData.attributes);
-
-    setCurrentTask({
-      optionA,
-      optionB
-    });
+  const generateTask = async (surveyId = id) => {
+    try {
+      setIsLoadingTask(true);
+      const response = await axios.get(
+        `http://localhost:5000/api/conjoint-surveys/${surveyId}/task`
+      );
+      setCurrentTask({
+        optionA: response.data.optionA,
+        optionB: response.data.optionB
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Unable to generate a survey task.");
+    } finally {
+      setIsLoadingTask(false);
+    }
   };
 
   const handleChoice = async (choice) => {
@@ -80,7 +77,7 @@ useEffect(() => {
     const updatedResponses = [...responses, newResponse];
     setResponses(updatedResponses);
     setTaskNumber(prev => prev + 1);
-    generateTask(survey);
+    await generateTask(id);
   };
 
 
@@ -193,10 +190,10 @@ if (!survey)
 
           <button
             onClick={() => handleChoice("A")}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingTask}
             className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Submitting..." : "Choose Option A"}
+            {isSubmitting ? "Submitting..." : isLoadingTask ? "Loading..." : "Choose Option A"}
           </button>
         </div>
 
@@ -226,10 +223,10 @@ if (!survey)
 
           <button
             onClick={() => handleChoice("B")}
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingTask}
             className="mt-8 w-full bg-indigo-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-indigo-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Submitting..." : "Choose Option B"}
+            {isSubmitting ? "Submitting..." : isLoadingTask ? "Loading..." : "Choose Option B"}
           </button>
         </div>
       </div>

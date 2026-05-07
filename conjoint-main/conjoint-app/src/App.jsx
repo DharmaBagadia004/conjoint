@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
+import ConjointDashboard from "./pages/ConjointDashboard";
 import CreateSurvey from "./pages/CreateSurvey";
 import RunSurvey from "./pages/RunSurvey";
 import Results from "./pages/Results";
@@ -12,6 +13,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Layout><Dashboard /></Layout>} />
+        <Route path="/analysis-dashboard" element={<Layout><ConjointDashboard /></Layout>} />
         <Route path="/create" element={<Layout><CreateSurvey /></Layout>} />
         <Route path="/surveys/:id" element={<Layout><SurveyDetails /></Layout>} />
         <Route path="/run/:id" element={<Layout><RunSurvey /></Layout>} />

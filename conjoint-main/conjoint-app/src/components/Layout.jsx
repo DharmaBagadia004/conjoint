@@ -24,11 +24,11 @@ function Layout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="sticky top-0 z-40 border-b border-slate-800 bg-gray-900 px-4 py-3 shadow-sm md:px-6">
+    <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
+      <div className="relative z-40 shrink-0 border-b border-slate-800 bg-gray-900 px-4 py-2 shadow-sm md:px-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-white md:text-xl">
+            <h1 className="text-base font-semibold text-white md:text-lg">
               Conjoint Lab
             </h1>
           </div>
@@ -38,7 +38,7 @@ function Layout({ children }) {
             onClick={() => setMenuOpen((open) => !open)}
             aria-expanded={menuOpen}
             aria-label="Toggle navigation menu"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-700 bg-gray-800 text-white transition hover:bg-gray-700"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-700 bg-gray-800 text-white transition hover:bg-gray-700"
           >
             <span className="sr-only">Open navigation</span>
             <div className="flex flex-col gap-1.5">
@@ -50,7 +50,7 @@ function Layout({ children }) {
         </div>
 
         {menuOpen ? (
-          <div className="absolute right-4 top-[calc(100%-0.25rem)] mt-3 w-64 rounded-2xl border border-slate-700 bg-gray-900 p-3 shadow-2xl md:right-6">
+          <div className="absolute right-4 top-full mt-3 w-64 rounded-2xl border border-slate-700 bg-gray-900 p-3 shadow-2xl md:right-6">
             <nav className="space-y-2">
               {navItem("/", "Dashboard")}
               {navItem("/analysis-dashboard", "Analysis Dashboard")}
@@ -61,8 +61,8 @@ function Layout({ children }) {
       </div>
 
       <div
-        className={`flex-1 p-4 md:p-6 ${
-          location.pathname === "/analysis-dashboard" ? "xl:overflow-hidden xl:p-5" : "xl:p-10"
+        className={`min-h-0 flex-1 p-3 md:p-4 ${
+          location.pathname === "/analysis-dashboard" ? "overflow-hidden xl:p-3" : "overflow-y-auto xl:p-8"
         }`}
       >
         {children}

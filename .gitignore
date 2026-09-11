@@ -1,20 +1,24 @@
-# Node
-frontend/node_modules
-frontend/dist
+# Dependencies and generated frontend output
+**/node_modules/
+**/dist/
 
-# Python
-backend/venv
-backend/__pycache__
-backend/*.pyc
+# Python environments, caches, and runtime data
+**/venv/
+**/__pycache__/
+*.py[cod]
+**/instance/*.db
 
-# Environment files
+# Secrets and local configuration
 .env
-backend/.env
+*.env
+!*.env.example
+key-secrets.txt
 
-# OS
+# Logs
+*.log
+
+# Editor and operating-system files
+.idea/
+.vscode/
 .DS_Store
 Thumbs.db
-
-# IDE
-.idea
-.vscode

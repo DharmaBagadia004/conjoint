@@ -56,15 +56,6 @@ function ConjointDashboard() {
   const [isControlMenuOpen, setIsControlMenuOpen] = useState(false);
   const [isInsightsMenuOpen, setIsInsightsMenuOpen] = useState(false);
   const [isStatsMenuOpen, setIsStatsMenuOpen] = useState(false);
-  const [collapsedPanels, setCollapsedPanels] = useState({
-    dataset: false,
-    personas: false,
-    filters: false,
-    focus: false,
-    profile: false,
-    summary: false,
-    levels: false,
-  });
 
   const selectedDataset = useMemo(
     () => datasets.find((dataset) => dataset.id === selectedDatasetId) ?? datasets[0],
@@ -127,22 +118,11 @@ function ConjointDashboard() {
     });
   };
 
-  const isPanelCollapsed = (panelId) => Boolean(collapsedPanels[panelId]);
-
-  const togglePanelCollapsed = (panelId) => {
-    setCollapsedPanels((current) => ({
-      ...current,
-      [panelId]: !current[panelId],
-    }));
-  };
-
   const datasetPanel = (
     <DatasetPanel
       datasets={datasets}
       selectedDatasetId={selectedDataset.id}
       onSelect={handleDatasetChange}
-      collapsed={isPanelCollapsed("dataset")}
-      onToggleCollapsed={() => togglePanelCollapsed("dataset")}
     />
   );
 
@@ -155,29 +135,27 @@ function ConjointDashboard() {
       onTogglePersona={handleTogglePersona}
       maxComparisonCount={MAX_COMPARISON_PERSONAS}
       warning={selectionWarning}
-      collapsed={isPanelCollapsed("personas")}
-      onToggleCollapsed={() => togglePanelCollapsed("personas")}
     />
   );
 
   const mainPanel = (
-    <div className="relative space-y-3 xl:flex xl:min-h-0 xl:flex-col">
-      <section className="rounded-[28px] border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-4 text-white shadow-lg">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+    <div className="relative space-y-2 xl:flex xl:h-full xl:min-h-0 xl:flex-col">
+      <section className="rounded-2xl border border-slate-700 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-3 text-white shadow-lg">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-emerald-300">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-emerald-300">
               Conjoint Analytics Matrix
             </p>
-            <h1 className="mt-2 text-xl font-semibold xl:text-2xl">
+            <h1 className="mt-1 text-lg font-semibold xl:text-xl">
               {selectedDataset.name}
             </h1>
-            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300 xl:text-sm">
+            <p className="mt-0.5 max-w-3xl text-[11px] leading-4 text-slate-300 xl:text-xs">
               Dense conjoint workspace for persona tradeoffs, utility spreads, and side-by-side preference monitoring.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 p-1">
+            <div className="flex flex-wrap items-center gap-1 rounded-xl border border-slate-700 bg-slate-950 p-0.5">
               {sectionOptions.map((section) => {
                 const active = activeSectionId === section.id;
                 return (
@@ -185,7 +163,7 @@ function ConjointDashboard() {
                     key={section.id}
                     type="button"
                     onClick={() => setActiveSectionId(section.id)}
-                    className={`rounded-xl px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] transition ${
+                    className={`rounded-lg px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] transition ${
                       active
                         ? "bg-emerald-400 text-slate-950"
                         : "text-slate-300 hover:bg-slate-900"
@@ -210,7 +188,7 @@ function ConjointDashboard() {
             <button
               type="button"
               onClick={() => setIsStatsMenuOpen((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
               aria-expanded={isStatsMenuOpen}
               aria-label="Toggle dashboard statistics"
             >
@@ -220,7 +198,7 @@ function ConjointDashboard() {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
-                className="h-4 w-4"
+                className="h-3.5 w-3.5"
               >
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 19h16" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V9" />
@@ -233,7 +211,7 @@ function ConjointDashboard() {
             <button
               type="button"
               onClick={() => setIsControlMenuOpen((current) => !current)}
-              className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
               aria-expanded={isControlMenuOpen}
               aria-label="Toggle dashboard controls"
             >
@@ -243,7 +221,7 @@ function ConjointDashboard() {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.8"
-                className="h-4 w-4"
+                className="h-3.5 w-3.5"
               >
                 <path strokeLinecap="round" d="M4 7h16" />
                 <path strokeLinecap="round" d="M4 12h16" />
@@ -256,7 +234,7 @@ function ConjointDashboard() {
               <button
                 type="button"
                 onClick={() => setIsInsightsMenuOpen((current) => !current)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200 transition hover:border-slate-600 hover:bg-slate-900"
                 aria-expanded={isInsightsMenuOpen}
                 aria-label="Toggle comparison insights"
               >
@@ -266,7 +244,7 @@ function ConjointDashboard() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.8"
-                  className="h-4 w-4"
+                  className="h-3.5 w-3.5"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v.01" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4" />
@@ -280,20 +258,20 @@ function ConjointDashboard() {
       </section>
 
       {isControlMenuOpen ? (
-        <div className="absolute right-0 top-[88px] z-30 w-full max-w-xl space-y-3 rounded-3xl border border-slate-700 bg-slate-950/95 p-3 shadow-2xl backdrop-blur xl:top-[92px]">
-          <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+        <div className="absolute right-0 top-[74px] z-30 w-full max-w-xl space-y-2 rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl backdrop-blur xl:top-[76px]">
+          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-1.5">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Dashboard Controls
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-0.5 text-[11px] text-slate-400">
                 Filters and section visibility
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsControlMenuOpen(false)}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:bg-slate-800"
+              className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:bg-slate-800"
             >
               Close
             </button>
@@ -307,8 +285,6 @@ function ConjointDashboard() {
             onAttributeChange={setSelectedAttributeId}
             utilityFilter={utilityFilter}
             onUtilityFilterChange={setUtilityFilter}
-            collapsed={isPanelCollapsed("filters")}
-            onToggleCollapsed={() => togglePanelCollapsed("filters")}
           />
 
           <SectionSelector
@@ -316,33 +292,31 @@ function ConjointDashboard() {
             selectedSectionId={activeSectionId}
             onSelectSection={setActiveSectionId}
             selectionMode="single"
-            collapsed={isPanelCollapsed("focus")}
-            onToggleCollapsed={() => togglePanelCollapsed("focus")}
           />
         </div>
       ) : null}
 
       {isStatsMenuOpen ? (
-        <div className="absolute right-0 top-[88px] z-20 w-full max-w-3xl rounded-3xl border border-slate-700 bg-slate-950/95 p-3 shadow-2xl backdrop-blur xl:top-[92px]">
-          <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+        <div className="absolute right-0 top-[74px] z-20 w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl backdrop-blur xl:top-[76px]">
+          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-1.5">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Dashboard Stats
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-0.5 text-[11px] text-slate-400">
                 Dataset, persona, and attribute snapshot
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsStatsMenuOpen(false)}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:bg-slate-800"
+              className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:bg-slate-800"
             >
               Close
             </button>
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               title="Dataset"
               value={selectedDataset.name}
@@ -372,37 +346,37 @@ function ConjointDashboard() {
       ) : null}
 
       {isInsightsMenuOpen && mode === "comparison" ? (
-        <div className="absolute right-0 top-[88px] z-20 w-full max-w-md rounded-3xl border border-slate-700 bg-slate-950/95 p-3 shadow-2xl backdrop-blur xl:right-[148px] xl:top-[92px]">
-          <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2">
+        <div className="absolute right-0 top-[74px] z-20 w-full max-w-md rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl backdrop-blur xl:right-[116px] xl:top-[76px]">
+          <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-1.5">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Comparison Insights
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-0.5 text-[11px] text-slate-400">
                 Secondary rule-based notes
               </p>
             </div>
             <button
               type="button"
               onClick={() => setIsInsightsMenuOpen(false)}
-              className="rounded-xl border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:bg-slate-800"
+              className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:bg-slate-800"
             >
               Close
             </button>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-2 space-y-1.5">
             {comparisonInsights.length > 0 ? (
               comparisonInsights.map((insight) => (
                 <div
                   key={insight.id}
-                  className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs leading-5 text-slate-300"
+                  className="rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs leading-4 text-slate-300"
                 >
                   {insight.text}
                 </div>
               ))
             ) : (
-              <div className="rounded-2xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs leading-5 text-slate-400">
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-2.5 py-2 text-xs leading-4 text-slate-400">
                 No comparison insights are available yet.
               </div>
             )}
@@ -410,54 +384,43 @@ function ConjointDashboard() {
         </div>
       ) : null}
 
-      <div className="xl:min-h-0 xl:flex-1 xl:overflow-hidden">
+      <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:pr-1">
       {mode === "single" ? (
         activePersona ? (
-            <div className="space-y-4 xl:flex xl:min-h-0 xl:flex-col">
+            <div className="space-y-2 xl:flex xl:min-h-full xl:flex-col">
               {activeSectionId === "profile" ? (
-                <section className="flex flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
+                <section className="flex max-h-full min-h-0 flex-col overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                         Active Persona
                       </p>
-                      <h2 className="mt-2 text-xl font-semibold text-slate-900">
+                      <h2 className="mt-1 text-lg font-semibold text-slate-900">
                         {activePersona.name}
                       </h2>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => togglePanelCollapsed("profile")}
-                      className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50"
-                    >
-                      {isPanelCollapsed("profile") ? "Expand" : "Collapse"}
-                    </button>
                   </div>
-                  {!isPanelCollapsed("profile") ? (
-                    <>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        {activePersona.description}
-                      </p>
-                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                        {activePersona.attributes.map((attribute) => (
-                          <div
-                            key={attribute.id}
-                            className="rounded-2xl bg-slate-50 p-4"
-                          >
-                            <p className="text-sm font-medium text-slate-800">
-                              {attribute.name}
-                            </p>
-                            <p className="mt-2 text-xl font-semibold text-slate-900">
-                              {Math.round(attribute.importance * 100)}%
-                            </p>
-                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400">
-                              importance
-                            </p>
-                          </div>
-                        ))}
+                  <p className="mt-1 text-sm leading-5 text-slate-600">
+                    {activePersona.description}
+                  </p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {activePersona.attributes.map((attribute) => (
+                      <div
+                        key={attribute.id}
+                        className="rounded-xl bg-slate-50 p-2.5"
+                      >
+                        <p className="text-sm font-medium text-slate-800">
+                          {attribute.name}
+                        </p>
+                        <p className="mt-1 text-lg font-semibold text-slate-900">
+                          {Math.round(attribute.importance * 100)}%
+                        </p>
+                        <p className="text-[10px] uppercase tracking-[0.12em] text-slate-400">
+                          importance
+                        </p>
                       </div>
-                    </>
-                  ) : null}
+                    ))}
+                  </div>
                 </section>
               ) : null}
 
@@ -468,8 +431,6 @@ function ConjointDashboard() {
                   selectedAttributeId={selectedAttributeId}
                   utilityFilter={utilityFilter}
                   className="xl:min-h-0 xl:flex-1"
-                  collapsed={isPanelCollapsed("levels")}
-                  onToggleCollapsed={() => togglePanelCollapsed("levels")}
                 />
               ) : null}
             </div>
@@ -485,12 +446,10 @@ function ConjointDashboard() {
           message="Comparison mode needs at least two personas from the selected dataset before charts and summaries can be shown."
         />
       ) : (
-        <div className="space-y-4 xl:flex xl:min-h-0 xl:flex-col">
+        <div className="space-y-2 xl:flex xl:min-h-full xl:flex-col">
           {activeSectionId === "summary" ? (
             <ComparisonSummary
               personas={selectedPersonas}
-              collapsed={isPanelCollapsed("summary")}
-              onToggleCollapsed={() => togglePanelCollapsed("summary")}
             />
           ) : null}
 
@@ -502,8 +461,6 @@ function ConjointDashboard() {
               selectedAttributeId={selectedAttributeId}
               utilityFilter={utilityFilter}
               className="xl:min-h-0 xl:flex-1"
-              collapsed={isPanelCollapsed("levels")}
-              onToggleCollapsed={() => togglePanelCollapsed("levels")}
             />
           ) : null}
         </div>
@@ -513,7 +470,7 @@ function ConjointDashboard() {
   );
 
   return (
-    <div className="mx-auto max-w-[1800px] xl:h-[calc(100vh-2.5rem)] xl:overflow-hidden">
+    <div className="mx-auto h-full max-w-[1900px] overflow-hidden">
       <DashboardLayout
         datasetPanel={datasetPanel}
         personaPanel={personaPanel}

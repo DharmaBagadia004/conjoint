@@ -40,9 +40,7 @@ function AttributeLevelsComparison({
   searchValue,
   selectedAttributeId,
   utilityFilter,
-  className = "",
-  collapsed = false,
-  onToggleCollapsed
+  className = ""
 }) {
   const [sortBy, setSortBy] = useState("attribute");
   const colorMap = getPersonaColorMap(personas);
@@ -93,52 +91,38 @@ function AttributeLevelsComparison({
   ];
 
   return (
-    <section className={`flex h-full min-h-0 flex-col rounded-3xl border border-slate-700 bg-slate-950 p-4 shadow-sm ${className}`}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <section className={`flex h-full min-h-0 flex-col rounded-2xl border border-slate-700 bg-slate-950 p-2.5 shadow-sm ${className}`}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-100">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-100">
             Attribute Levels
           </h2>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
+          <p className="text-xs leading-4 text-slate-400">
             Utility spread matrix across personas
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {onToggleCollapsed ? (
-            <button
-              type="button"
-              onClick={onToggleCollapsed}
-              className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:bg-slate-800"
-            >
-              {collapsed ? "Expand" : "Collapse"}
-            </button>
-          ) : null}
-          {!collapsed ? (
-            <>
-              <select
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value)}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200"
-              >
-                <option value="attribute">Sort: Attribute Name</option>
-                <option value="highest-utility">Sort: Highest Utility</option>
-                <option value="largest-difference">Sort: Largest Difference</option>
-              </select>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+          >
+            <option value="attribute">Sort: Attribute Name</option>
+            <option value="highest-utility">Sort: Highest Utility</option>
+            <option value="largest-difference">Sort: Largest Difference</option>
+          </select>
 
-              <UtilityExportButton
-                label="Export CSV"
-                filename="persona-level-utilities-comparison.csv"
-                rows={exportRows}
-                disabled={!comparisonAttributes.length}
-              />
-            </>
-          ) : null}
+          <UtilityExportButton
+            label="Export CSV"
+            filename="persona-level-utilities-comparison.csv"
+            rows={exportRows}
+            disabled={!comparisonAttributes.length}
+          />
         </div>
       </div>
 
-      {!collapsed ? (
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
         {comparisonAttributes.map((attribute) => {
           const chartData = attribute.levels.map((level) => {
             const row = { level: level.name };
@@ -152,19 +136,19 @@ function AttributeLevelsComparison({
             <details
               key={attribute.id}
               open
-              className="rounded-2xl border border-slate-800 bg-slate-900 p-3"
+              className="rounded-xl border border-slate-800 bg-slate-900 p-2"
             >
               <summary className="cursor-pointer list-none">
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-slate-100">
+                    <h3 className="text-sm font-semibold leading-5 text-slate-100">
                       {attribute.name}
                     </h3>
-                    <p className="mt-1 text-[11px] text-slate-400">
+                    <p className="text-xs leading-4 text-slate-400">
                       Largest utility spread: {attribute.largestSpread.toFixed(0)} points
                     </p>
                   </div>
-                  <span className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
                     {attribute.levels.length} levels
                   </span>
                 </div>
@@ -172,15 +156,15 @@ function AttributeLevelsComparison({
 
               {chartView === "chart" ? (
                 <div
-                  className="mt-4"
-                  style={{ height: `${Math.max(230, attribute.levels.length * 64)}px` }}
+                  className="mt-1.5"
+                  style={{ height: `${Math.max(170, attribute.levels.length * 46)}px` }}
                 >
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData}
                       layout="vertical"
-                      margin={{ left: 16, right: 20, top: 12, bottom: 4 }}
-                      barCategoryGap={18}
+                      margin={{ left: 8, right: 12, top: 8, bottom: 0 }}
+                      barCategoryGap={10}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                       <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} />
@@ -199,36 +183,36 @@ function AttributeLevelsComparison({
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                <div className="mt-1.5 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-800 bg-slate-900 text-left text-slate-400">
-                        <th className="px-4 py-3 pr-4 font-medium">Level</th>
+                        <th className="px-2.5 py-1.5 pr-3 font-medium">Level</th>
                         {personas.map((persona) => (
-                          <th key={persona.id} className="px-4 py-3 pr-4 font-medium">
+                          <th key={persona.id} className="px-2.5 py-1.5 pr-3 font-medium">
                             {persona.name}
                           </th>
                         ))}
-                        <th className="px-4 py-3 font-medium">Spread</th>
+                        <th className="px-2.5 py-1.5 font-medium">Spread</th>
                       </tr>
                     </thead>
                     <tbody>
                       {attribute.levels.map((level) => (
                         <tr key={level.id} className="border-b border-slate-800 last:border-b-0">
-                          <td className="px-4 py-3 pr-4 font-medium text-slate-100">
+                          <td className="px-2.5 py-1.5 pr-3 font-medium text-slate-100">
                             {level.name}
                           </td>
                           {level.utilities.map((item) => {
                             const highest = item.utility === level.highestUtility;
                             return (
-                              <td key={item.personaId} className="px-4 py-3 pr-4">
-                                <div className={highest ? "rounded-xl bg-emerald-50 px-2 py-1" : ""}>
+                              <td key={item.personaId} className="px-2.5 py-1.5 pr-3">
+                                <div className={highest ? "rounded-lg bg-emerald-50 px-1.5 py-0.5" : ""}>
                                   <UtilityBadge value={item.utility} />
                                 </div>
                               </td>
                             );
                           })}
-                          <td className="px-4 py-3 text-slate-300">
+                          <td className="px-2.5 py-1.5 text-slate-300">
                             {level.spread.toFixed(0)}
                           </td>
                         </tr>
@@ -241,7 +225,6 @@ function AttributeLevelsComparison({
           );
         })}
       </div>
-      ) : null}
     </section>
   );
 }

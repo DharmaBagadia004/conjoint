@@ -2,9 +2,7 @@ import MetricCard from "./MetricCard";
 
 function ComparisonSummary({
   personas,
-  className = "",
-  collapsed = false,
-  onToggleCollapsed
+  className = ""
 }) {
   const summaryCards = [
     {
@@ -26,18 +24,8 @@ function ComparisonSummary({
           </p>
         </div>
 
-        {onToggleCollapsed ? (
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:bg-slate-800"
-          >
-            {collapsed ? "Expand" : "Collapse"}
-          </button>
-        ) : null}
       </div>
 
-      {!collapsed ? (
       <div className="grid gap-3 md:grid-cols-2">
         {summaryCards.map((card) => (
           <MetricCard
@@ -48,7 +36,6 @@ function ComparisonSummary({
           />
         ))}
       </div>
-      ) : null}
     </section>
   );
 }

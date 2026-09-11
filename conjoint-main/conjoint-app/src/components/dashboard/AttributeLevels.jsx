@@ -21,9 +21,7 @@ function AttributeLevels({
   searchValue,
   selectedAttributeId,
   utilityFilter,
-  className = "",
-  collapsed = false,
-  onToggleCollapsed
+  className = ""
 }) {
   const [sortBy, setSortBy] = useState("attribute");
 
@@ -69,81 +67,67 @@ function AttributeLevels({
   ];
 
   return (
-    <section className={`flex h-full min-h-0 flex-col rounded-3xl border border-slate-700 bg-slate-950 p-4 shadow-sm ${className}`}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <section className={`flex h-full min-h-0 flex-col rounded-2xl border border-slate-700 bg-slate-950 p-2.5 shadow-sm ${className}`}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-100">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-100">
             Attribute Levels
           </h2>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
+          <p className="text-xs leading-4 text-slate-400">
             Part-worth utility matrix
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          {onToggleCollapsed ? (
-            <button
-              type="button"
-              onClick={onToggleCollapsed}
-              className="rounded-xl border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:bg-slate-800"
-            >
-              {collapsed ? "Expand" : "Collapse"}
-            </button>
-          ) : null}
-          {!collapsed ? (
-            <>
-              <select
-                value={sortBy}
-                onChange={(event) => setSortBy(event.target.value)}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200"
-              >
-                <option value="attribute">Sort: Attribute Name</option>
-                <option value="highest-utility">Sort: Highest Utility</option>
-              </select>
+        <div className="flex flex-wrap gap-2">
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+          >
+            <option value="attribute">Sort: Attribute Name</option>
+            <option value="highest-utility">Sort: Highest Utility</option>
+          </select>
 
-              <UtilityExportButton
-                label="Export CSV"
-                filename={`${persona.id}-attribute-levels.csv`}
-                rows={exportRows}
-                disabled={!filteredAttributes.length}
-              />
-            </>
-          ) : null}
+          <UtilityExportButton
+            label="Export CSV"
+            filename={`${persona.id}-attribute-levels.csv`}
+            rows={exportRows}
+            disabled={!filteredAttributes.length}
+          />
         </div>
       </div>
 
-      {!collapsed ? (
-      <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+      <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
         {filteredAttributes.map((attribute) => (
           <details
             key={attribute.id}
             open
-            className="rounded-2xl border border-slate-800 bg-slate-900 p-3"
+            className="rounded-xl border border-slate-800 bg-slate-900 p-2"
           >
             <summary className="cursor-pointer list-none">
-              <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-100">
+                  <h3 className="text-sm font-semibold leading-5 text-slate-100">
                     {attribute.name}
                   </h3>
-                  <p className="mt-1 text-[11px] text-slate-400">
+                  <p className="text-xs leading-4 text-slate-400">
                     Importance: {Math.round(attribute.importance * 100)}%
                   </p>
                 </div>
-                <span className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
                   {attribute.levels.length} levels
                 </span>
               </div>
             </summary>
 
-            <div className="mt-3 space-y-2">
+            <div className="mt-1.5 space-y-1">
               {attribute.levels.map((level) => (
                 <div
                   key={level.id}
-                  className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-950 p-3 lg:grid-cols-[minmax(0,150px)_72px_minmax(0,1fr)] lg:items-center"
+                  className="grid gap-2 rounded-lg border border-slate-800 bg-slate-950 px-2 py-1.5 lg:grid-cols-[minmax(0,130px)_60px_minmax(0,1fr)] lg:items-center"
                 >
                   <div>
-                    <p className="text-sm font-medium text-slate-200">
+                    <p className="text-sm font-medium leading-5 text-slate-200">
                       {level.name}
                     </p>
                   </div>
@@ -155,7 +139,6 @@ function AttributeLevels({
           </details>
         ))}
       </div>
-      ) : null}
     </section>
   );
 }

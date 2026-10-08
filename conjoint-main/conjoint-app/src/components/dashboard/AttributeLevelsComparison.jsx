@@ -1,3 +1,4 @@
+import ChartPager from "./ChartPager";
 import { useMemo, useState } from "react";
 import {
   Bar,
@@ -40,6 +41,8 @@ function AttributeLevelsComparison({
   searchValue,
   selectedAttributeId,
   utilityFilter,
+  onPreviousView,
+  onNextView,
   className = ""
 }) {
   const [sortBy, setSortBy] = useState("attribute");
@@ -91,22 +94,23 @@ function AttributeLevelsComparison({
   ];
 
   return (
-    <section className={`flex h-full min-h-0 flex-col rounded-2xl border border-slate-700 bg-slate-950 p-2.5 shadow-sm ${className}`}>
+    <section className={`flex min-h-0 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${className}`}>
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-100">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-900">
             Attribute Levels
           </h2>
-          <p className="text-xs leading-4 text-slate-400">
+          <p className="text-xs leading-4 text-slate-500">
             Utility spread matrix across personas
           </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <select
+            aria-label="Sort attribute levels"
             value={sortBy}
             onChange={(event) => setSortBy(event.target.value)}
-            className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
           >
             <option value="attribute">Sort: Attribute Name</option>
             <option value="highest-utility">Sort: Highest Utility</option>
@@ -122,8 +126,14 @@ function AttributeLevelsComparison({
         </div>
       </div>
 
-      <div className="mt-2 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
-        {comparisonAttributes.map((attribute) => {
+      <div className="mt-5 min-h-0 flex-1 space-y-3">
+        {!comparisonAttributes.length ? (
+          <div role="status" className="rounded-xl border border-dashed border-slate-300 px-5 py-12 text-center">
+            <p className="text-sm font-semibold text-slate-800">No matching levels</p>
+            <p className="mt-2 text-sm text-slate-500">Try another search or choose all attributes and utilities.</p>
+          </div>
+        ) : null}
+        <ChartPager items={comparisonAttributes} onPreviousView={onPreviousView} onNextView={onNextView}>{(attribute) => {
           const chartData = attribute.levels.map((level) => {
             const row = { level: level.name };
             level.utilities.forEach((item) => {
@@ -136,19 +146,19 @@ function AttributeLevelsComparison({
             <details
               key={attribute.id}
               open
-              className="rounded-xl border border-slate-800 bg-slate-900 p-2"
+              className="rounded-xl border border-slate-200 bg-slate-50 p-4"
             >
-              <summary className="cursor-pointer list-none">
+              <summary className="analysis-disclosure cursor-pointer list-none">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold leading-5 text-slate-100">
+                    <h3 className="text-sm font-semibold leading-5 text-slate-900">
                       {attribute.name}
                     </h3>
-                    <p className="text-xs leading-4 text-slate-400">
+                    <p className="text-xs leading-4 text-slate-500">
                       Largest utility spread: {attribute.largestSpread.toFixed(0)} points
                     </p>
                   </div>
-                  <span className="rounded-full bg-slate-950 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
+                  <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                     {attribute.levels.length} levels
                   </span>
                 </div>
@@ -166,9 +176,9 @@ function AttributeLevelsComparison({
                       margin={{ left: 8, right: 12, top: 8, bottom: 0 }}
                       barCategoryGap={10}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                      <YAxis type="category" dataKey="level" width={100} tick={{ fill: "#cbd5e1", fontSize: 11 }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis type="number" tick={{ fill: "#64748b", fontSize: 11 }} />
+                      <YAxis type="category" dataKey="level" width={100} tick={{ fill: "#475569", fontSize: 11 }} />
                       <Tooltip />
                       <Legend />
                       {personas.map((persona) => (
@@ -183,10 +193,10 @@ function AttributeLevelsComparison({
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="mt-1.5 overflow-x-auto rounded-xl border border-slate-800 bg-slate-950">
+                <div className="mt-1.5 overflow-x-auto rounded-xl border border-slate-200 bg-white">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-800 bg-slate-900 text-left text-slate-400">
+                      <tr className="border-b border-slate-200 bg-slate-50 text-left text-slate-500">
                         <th className="px-2.5 py-1.5 pr-3 font-medium">Level</th>
                         {personas.map((persona) => (
                           <th key={persona.id} className="px-2.5 py-1.5 pr-3 font-medium">
@@ -198,8 +208,8 @@ function AttributeLevelsComparison({
                     </thead>
                     <tbody>
                       {attribute.levels.map((level) => (
-                        <tr key={level.id} className="border-b border-slate-800 last:border-b-0">
-                          <td className="px-2.5 py-1.5 pr-3 font-medium text-slate-100">
+                        <tr key={level.id} className="border-b border-slate-200 last:border-b-0">
+                          <td className="px-2.5 py-1.5 pr-3 font-medium text-slate-900">
                             {level.name}
                           </td>
                           {level.utilities.map((item) => {
@@ -212,7 +222,7 @@ function AttributeLevelsComparison({
                               </td>
                             );
                           })}
-                          <td className="px-2.5 py-1.5 text-slate-300">
+                          <td className="px-2.5 py-1.5 text-slate-600">
                             {level.spread.toFixed(0)}
                           </td>
                         </tr>
@@ -223,7 +233,7 @@ function AttributeLevelsComparison({
               )}
             </details>
           );
-        })}
+        }}</ChartPager>
       </div>
     </section>
   );

@@ -1,14 +1,14 @@
 function MetricCard({ title, value, detail }) {
   return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 shadow-sm">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
         {title}
       </p>
-      <p className="mt-2 text-base font-semibold text-slate-100">
+      <p className="mt-2 text-3xl font-semibold tracking-tight text-slate-900">
         {value}
       </p>
       {detail ? (
-        <p className="mt-1 text-[11px] leading-5 text-slate-400">
+        <p className="mt-1 text-xs leading-5 text-slate-500">
           {detail}
         </p>
       ) : null}

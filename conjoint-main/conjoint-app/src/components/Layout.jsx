@@ -62,7 +62,7 @@ function Layout({ children }) {
 
       <div
         className={`min-h-0 flex-1 p-3 md:p-4 ${
-          location.pathname === "/analysis-dashboard" ? "overflow-hidden xl:p-3" : "overflow-y-auto xl:p-8"
+          location.pathname === "/analysis-dashboard" ? "overflow-y-auto xl:p-6" : "overflow-y-auto xl:p-8"
         }`}
       >
         {children}

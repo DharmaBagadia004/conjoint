@@ -1,3 +1,20 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* Keep analysis interactions clear without affecting survey screens. */
+.analysis-dashboard :is(button, input, select, summary):focus-visible {
+  outline: 3px solid #059669;
+  outline-offset: 3px;
+}
+.analysis-dashboard :is(button, input, select) { min-height: 36px; }
+.analysis-header {
+  background-image: radial-gradient(ellipse at top right, #134e4a 0%, transparent 65%);
+}
+.analysis-disclosure > div::after {
+  content: "+";
+  color: #64748b;
+  font-size: 20px;
+}
+details[open] > .analysis-disclosure > div::after { content: "\2212"; }
+.analysis-disclosure > div > div { flex: 1; }
+.analysis-dashboard table { font-variant-numeric: tabular-nums; }

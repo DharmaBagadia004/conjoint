@@ -134,6 +134,44 @@ def _extract_attribute_levels(attribute):
     return [level.value for level in attribute.levels]
 
 
+def _analysis_attributes(attributes, survey=None):
+    """Uploaded rank columns describe the outcome, not a product feature."""
+    design_config = getattr(survey, "design_config", None) or {}
+    included_names = design_config.get("included_attributes")
+    included_keys = {_normalize_key(name) for name in included_names} if isinstance(included_names, list) else None
+    return [
+        attribute for attribute in attributes
+        if _normalize_key(attribute.name) not in {"rank", "ranking", "rankorder", "rankingorder"}
+        and (included_keys is None or _normalize_key(attribute.name) in included_keys)
+    ]
+
+
+def _ordered_discrete_price_levels(levels):
+    tier_ranks = {
+        "low": 0, "budget": 0, "economy": 0, "entry": 0, "affordable": 0,
+        "medium": 1, "mid": 1, "midrange": 1, "mainstream": 1, "standard": 1,
+        "high": 2, "premium": 2, "luxury": 2, "top": 2,
+    }
+
+    def order_key(value):
+        text = str(value).strip().lower()
+        tokens = re.findall(r"[a-z]+", text)
+        matched_ranks = [tier_ranks[token] for token in tokens if token in tier_ranks]
+        if matched_ranks:
+            return (0, matched_ranks[0])
+        match = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*([km]?)", text)
+        if match:
+            number = float(match.group(1).replace(",", ""))
+            multiplier = {"k": 1000, "m": 1000000}.get(match.group(2), 1)
+            return (1, number * multiplier)
+        return None
+
+    keys = [order_key(level) for level in levels]
+    if all(key is not None for key in keys) and len(set(keys)) == len(keys):
+        return [level for _, level in sorted(zip(keys, levels))]
+    return levels
+
+
 def _build_default_price_weights(attributes, price_attribute_name):
     non_price_attributes = [
         attr for attr in attributes
@@ -142,8 +180,23 @@ def _build_default_price_weights(attributes, price_attribute_name):
     if not non_price_attributes:
         return {}
 
-    equal_weight = 1 / len(non_price_attributes)
-    return {attr.name: equal_weight for attr in non_price_attributes}
+    brand_attributes = [
+        attr for attr in non_price_attributes
+        if any(hint in (_normalize_key(attr.name) or "") for hint in ("brand", "manufacturer", "make"))
+    ]
+    if not brand_attributes:
+        equal_weight = 1 / len(non_price_attributes)
+        return {attr.name: equal_weight for attr in non_price_attributes}
+
+    # Brand tier is a strong vehicle price signal; divide the remaining weight
+    # across the other product attributes.
+    brand_weight = 0.5 / len(brand_attributes)
+    other_attributes = [attr for attr in non_price_attributes if attr not in brand_attributes]
+    other_weight = 0.5 / len(other_attributes) if other_attributes else 0
+    return {
+        attr.name: brand_weight if attr in brand_attributes else other_weight
+        for attr in non_price_attributes
+    }
 
 
 def _normalize_component_weights(components):
@@ -175,6 +228,7 @@ def _normalize_component_weights(components):
 
 
 def _default_price_config_for_survey(survey, attributes):
+    attributes = _analysis_attributes(attributes, survey)
     price_attribute = _find_price_attribute(attributes)
     if not price_attribute:
         return None
@@ -242,6 +296,7 @@ def _merged_price_config(survey, attributes):
 
 
 def _build_price_formula(survey, attributes):
+    attributes = _analysis_attributes(attributes, survey)
     price_config = _merged_price_config(survey, attributes)
     if not price_config:
         return None
@@ -250,14 +305,11 @@ def _build_price_formula(survey, attributes):
     if not price_attribute:
         return None
 
-    price_levels = [
-        _parse_price_value(level.value)
-        for level in price_attribute.levels
-    ]
-    numeric_price_levels = [level for level in price_levels if level is not None]
-    if len(numeric_price_levels) < 2:
-        return None
     price_level_labels = _extract_attribute_levels(price_attribute)
+    price_level_labels = _ordered_discrete_price_levels(price_level_labels)
+    if len(price_level_labels) < 2:
+        return None
+    price_mode = "discrete"
 
     attribute_lookup = {attr.name: attr for attr in attributes}
     included_components = []
@@ -281,23 +333,28 @@ def _build_price_formula(survey, attributes):
     if not included_components:
         return None
 
-    min_price = min(numeric_price_levels)
-    max_price = max(numeric_price_levels)
-    equation = (
-        f"{price_attribute.name} = min_price + (max_price - min_price) x "
-        "weighted_feature_score, where weighted_feature_score = "
-        "sum(weight x normalized_level_score) / sum(weight)"
-    )
-
     display_terms = [
         f"{component['weight']:.2f} x {component['attribute']} ({component['direction']})"
         for component in included_components
     ]
 
+    min_price_label = price_level_labels[0]
+    max_price_label = price_level_labels[-1]
+    equation = (
+        f"{price_attribute.name} is selected from its ordered levels using "
+        "weighted_feature_score = sum(weight x normalized_level_score) / sum(weight)"
+    )
+    display_equation = (
+        f"{price_attribute.name} = ordered level selected from "
+        f"[({ ' + '.join(display_terms) }) / 1.00]"
+    )
+
     return {
         "price_attribute": price_attribute.name,
-        "min_price": _format_price_value(min_price, price_level_labels),
-        "max_price": _format_price_value(max_price, price_level_labels),
+        "mode": price_mode,
+        "min_price": min_price_label,
+        "max_price": max_price_label,
+        "price_levels": price_level_labels,
         "components": [
             {
                 "attribute": component["attribute"],
@@ -308,11 +365,7 @@ def _build_price_formula(survey, attributes):
             for component in price_config["components"]
         ],
         "equation": equation,
-        "display_equation": (
-            f"{price_attribute.name} = { _format_price_value(min_price, price_level_labels) } + "
-            f"({ _format_price_value(max_price, price_level_labels) } - { _format_price_value(min_price, price_level_labels) }) x "
-            f"[({ ' + '.join(display_terms) }) / 1.00]"
-        ),
+        "display_equation": display_equation,
         "active_components": included_components,
         "price_level_labels": price_level_labels,
     }
@@ -349,6 +402,13 @@ def _compute_price_from_formula(profile, formula):
         denominator += component["weight"]
 
     weighted_score = numerator / denominator if denominator else 0.0
+    if formula.get("mode") == "discrete":
+        price_levels = formula.get("price_levels", [])
+        if not price_levels:
+            return None
+        level_index = min(int(weighted_score * len(price_levels)), len(price_levels) - 1)
+        return price_levels[level_index]
+
     min_price = _parse_price_value(formula["min_price"])
     max_price = _parse_price_value(formula["max_price"])
     if min_price is None or max_price is None:
@@ -503,37 +563,177 @@ def _parse_json_dataset(raw_bytes):
     )
 
 
-def _generate_random_profile(attributes, exclude_names=None):
+def _normalize_prohibited_pairs(attributes, raw_pairs):
+    if not isinstance(raw_pairs, list):
+        raise ValueError("prohibited_pairs must be a list.")
+
+    attribute_by_id = {attribute.id: attribute for attribute in attributes}
+    normalized_pairs = []
+    seen_pairs = set()
+    for pair in raw_pairs:
+        if not isinstance(pair, dict):
+            raise ValueError("Each prohibited pair must be an object.")
+        try:
+            attribute_a_id = int(pair.get("attribute_a"))
+            level_a_id = int(pair.get("level_a"))
+            attribute_b_id = int(pair.get("attribute_b"))
+            level_b_id = int(pair.get("level_b"))
+        except (TypeError, ValueError):
+            raise ValueError("Each prohibited pair must reference valid attribute and level IDs.")
+
+        attribute_a = attribute_by_id.get(attribute_a_id)
+        attribute_b = attribute_by_id.get(attribute_b_id)
+        if not attribute_a or not attribute_b or attribute_a_id == attribute_b_id:
+            raise ValueError("A prohibited pair must use levels from two different survey attributes.")
+        levels_a = {level.id: level for level in attribute_a.levels}
+        levels_b = {level.id: level for level in attribute_b.levels}
+        level_a = levels_a.get(level_a_id)
+        level_b = levels_b.get(level_b_id)
+        if not level_a or not level_b:
+            raise ValueError("A prohibited pair references a level that is not in this survey.")
+
+        signature = tuple(sorted(((attribute_a_id, level_a_id), (attribute_b_id, level_b_id))))
+        if signature in seen_pairs:
+            continue
+        seen_pairs.add(signature)
+        normalized_pairs.append({
+            "attribute_a": attribute_a_id,
+            "level_a": level_a_id,
+            "attribute_b": attribute_b_id,
+            "level_b": level_b_id,
+            "attribute_a_name": attribute_a.name,
+            "level_a_value": level_a.value,
+            "attribute_b_name": attribute_b.name,
+            "level_b_value": level_b.value,
+        })
+    return normalized_pairs
+
+
+def _count_valid_profiles(attributes, prohibited_pairs, limit=10001):
+    pair_tokens = [
+        frozenset((
+            (_normalize_key(pair["attribute_a_name"]), pair["level_a_value"]),
+            (_normalize_key(pair["attribute_b_name"]), pair["level_b_value"]),
+        ))
+        for pair in prohibited_pairs
+    ]
+    total_profiles = 1
+    for attribute in attributes:
+        total_profiles *= len(attribute.levels)
+
+    valid_count = 0
+    selected = {}
+
+    def visit(index):
+        nonlocal valid_count
+        if valid_count >= limit:
+            return
+        if index >= len(attributes):
+            valid_count += 1
+            return
+
+        attribute = attributes[index]
+        for level in attribute.levels:
+            candidate = (_normalize_key(attribute.name), level.value)
+            conflicts = any(
+                candidate in pair and all(token in selected.values() for token in pair if token != candidate)
+                for pair in pair_tokens
+            )
+            if conflicts:
+                continue
+            selected[attribute.id] = candidate
+            visit(index + 1)
+            selected.pop(attribute.id, None)
+            if valid_count >= limit:
+                return
+
+    visit(0)
+    return {
+        "total_profiles": total_profiles,
+        "valid_profiles": valid_count,
+        "valid_profiles_capped": valid_count >= limit,
+    }
+
+
+def _generate_random_profile(attributes, exclude_names=None, prohibited_pairs=None, exclude_profiles=None):
     exclude_keys = {_normalize_key(name) for name in (exclude_names or [])}
+    selected_attributes = [
+        attribute for attribute in attributes
+        if _normalize_key(attribute.name) not in exclude_keys and attribute.levels
+    ]
+    pair_tokens = [
+        frozenset((
+            (_normalize_key(pair["attribute_a_name"]), pair["level_a_value"]),
+            (_normalize_key(pair["attribute_b_name"]), pair["level_b_value"]),
+        ))
+        for pair in (prohibited_pairs or [])
+    ]
+    excluded = exclude_profiles or []
     profile = {}
-    for attr in attributes:
-        if _normalize_key(attr.name) in exclude_keys:
-            continue
-        levels = [level.value for level in attr.levels]
-        if not levels:
-            continue
-        profile[attr.name] = random.choice(levels)
+    selected = set()
+
+    def visit(index):
+        if index >= len(selected_attributes):
+            if any(profile == excluded_profile for excluded_profile in excluded):
+                return False
+            return True
+
+        attribute = selected_attributes[index]
+        levels = list(attribute.levels)
+        random.shuffle(levels)
+        for level in levels:
+            candidate = (_normalize_key(attribute.name), level.value)
+            conflicts = any(
+                candidate in pair and all(token in selected for token in pair if token != candidate)
+                for pair in pair_tokens
+            )
+            if conflicts:
+                continue
+            profile[attribute.name] = level.value
+            selected.add(candidate)
+            if visit(index + 1):
+                return True
+            selected.remove(candidate)
+            profile.pop(attribute.name, None)
+        return False
+
+    if not visit(0):
+        raise ValueError("The survey design does not have enough valid profiles to generate a choice task.")
     return profile
 
 
 def _generate_task_options(survey, attributes):
+    attributes = _analysis_attributes(attributes, survey)
+    design_config = survey.design_config if isinstance(survey.design_config, dict) else {}
+    prohibited_pairs = _normalize_prohibited_pairs(
+        attributes,
+        design_config.get("prohibited_pairs", []),
+    )
     formula = _build_price_formula(survey, attributes)
+    price_attribute = _find_price_attribute(attributes)
+    if formula and price_attribute and any(
+        pair["attribute_a"] == price_attribute.id or pair["attribute_b"] == price_attribute.id
+        for pair in prohibited_pairs
+    ):
+        # Price-level restrictions require the configured price levels to remain discrete.
+        formula = None
     price_attribute_name = formula["price_attribute"] if formula else None
 
-    option_a = _generate_random_profile(attributes, exclude_names=[price_attribute_name] if price_attribute_name else None)
-    option_b = _generate_random_profile(attributes, exclude_names=[price_attribute_name] if price_attribute_name else None)
+    option_a = _generate_random_profile(
+        attributes,
+        exclude_names=[price_attribute_name] if price_attribute_name else None,
+        prohibited_pairs=prohibited_pairs,
+    )
+    option_b = _generate_random_profile(
+        attributes,
+        exclude_names=[price_attribute_name] if price_attribute_name else None,
+        prohibited_pairs=prohibited_pairs,
+        exclude_profiles=[option_a],
+    )
 
     if formula and price_attribute_name:
         option_a[price_attribute_name] = _compute_price_from_formula(option_a, formula)
         option_b[price_attribute_name] = _compute_price_from_formula(option_b, formula)
-
-    attempts = 0
-
-    while option_a == option_b and attempts < 10:
-        option_b = _generate_random_profile(attributes, exclude_names=[price_attribute_name] if price_attribute_name else None)
-        if formula and price_attribute_name:
-            option_b[price_attribute_name] = _compute_price_from_formula(option_b, formula)
-        attempts += 1
 
     return option_a, option_b
 
@@ -568,6 +768,7 @@ def _serialize_price_formula(price_formula):
         "price_attribute": price_formula["price_attribute"],
         "min_price": price_formula["min_price"],
         "max_price": price_formula["max_price"],
+        "mode": price_formula.get("mode", "continuous"),
         "equation": price_formula["equation"],
         "display_equation": price_formula["display_equation"],
         "components": [
@@ -708,7 +909,10 @@ def import_conjoint_survey_dataset():
 
 @bp.route("/conjoint-surveys", methods=["GET"])
 def list_conjoint_surveys():
-    surveys = ConjointSurvey.query.all()
+    surveys_query = ConjointSurvey.query
+    if request.args.get("include_archived", "false").lower() != "true":
+        surveys_query = surveys_query.filter_by(is_archived=False)
+    surveys = surveys_query.all()
 
     result = []
     for survey in surveys:
@@ -724,12 +928,30 @@ def list_conjoint_surveys():
 @bp.route("/conjoint-surveys/<int:survey_id>", methods=["GET"])
 def get_conjoint_survey(survey_id):
     survey = ConjointSurvey.query.get_or_404(survey_id)
-    price_formula = _build_price_formula(survey, survey.attributes)
+    attributes = _analysis_attributes(survey.attributes, survey)
+    price_formula = _build_price_formula(survey, attributes)
+    design_config = survey.design_config if isinstance(survey.design_config, dict) else {}
+    prohibited_pairs = _normalize_prohibited_pairs(
+        attributes,
+        design_config.get("prohibited_pairs", []),
+    )
+    design_stats = _count_valid_profiles(attributes, prohibited_pairs)
+    price_attribute = _find_price_attribute(attributes)
+    price_formula_disabled_reason = None
+    if price_formula and price_attribute and any(
+        pair["attribute_a"] == price_attribute.id or pair["attribute_b"] == price_attribute.id
+        for pair in prohibited_pairs
+    ):
+        price_formula = None
+        price_formula_disabled_reason = "Price level restrictions are active, so generated profiles use the discrete price levels defined in the survey."
 
     return jsonify({
         "id": survey.id,
         "title": survey.title,
         "price_formula": _serialize_price_formula(price_formula),
+        "price_formula_disabled_reason": price_formula_disabled_reason,
+        "prohibited_pairs": prohibited_pairs,
+        "design_stats": design_stats,
         "attributes": [
             {
                 "id": attr.id,
@@ -739,8 +961,48 @@ def get_conjoint_survey(survey_id):
                     for level in attr.levels
                 ]
             }
-            for attr in survey.attributes
+            for attr in attributes
         ]
+    })
+
+
+@bp.route("/conjoint-surveys/<int:survey_id>/prohibited-pairs", methods=["PATCH"])
+def update_conjoint_prohibited_pairs(survey_id):
+    survey = ConjointSurvey.query.get_or_404(survey_id)
+    attributes = _analysis_attributes(survey.attributes, survey)
+    payload = request.get_json() or {}
+
+    try:
+        prohibited_pairs = _normalize_prohibited_pairs(
+            attributes,
+            payload.get("prohibited_pairs", []),
+        )
+    except ValueError as err:
+        return jsonify({"error": str(err)}), 400
+
+    design_stats = _count_valid_profiles(attributes, prohibited_pairs)
+    if design_stats["valid_profiles"] < 2:
+        return jsonify({
+            "error": "These restrictions leave fewer than two valid profiles, so the survey cannot show a choice between distinct options.",
+            "design_stats": design_stats,
+        }), 400
+
+    survey.design_config = {"prohibited_pairs": prohibited_pairs}
+    db.session.commit()
+    price_formula = _build_price_formula(survey, attributes)
+    price_attribute = _find_price_attribute(attributes)
+    price_formula_disabled_reason = None
+    if price_formula and price_attribute and any(
+        pair["attribute_a"] == price_attribute.id or pair["attribute_b"] == price_attribute.id
+        for pair in prohibited_pairs
+    ):
+        price_formula = None
+        price_formula_disabled_reason = "Price level restrictions are active, so generated profiles use the discrete price levels defined in the survey."
+    return jsonify({
+        "prohibited_pairs": prohibited_pairs,
+        "design_stats": design_stats,
+        "price_formula": _serialize_price_formula(price_formula),
+        "price_formula_disabled_reason": price_formula_disabled_reason,
     })
 
 
@@ -757,13 +1019,14 @@ def generate_conjoint_task(survey_id):
 @bp.route("/conjoint-surveys/<int:survey_id>/price-config", methods=["PATCH"])
 def update_conjoint_price_config(survey_id):
     survey = ConjointSurvey.query.get_or_404(survey_id)
+    attributes = _analysis_attributes(survey.attributes, survey)
     payload = request.get_json() or {}
     components = payload.get("components")
 
     if not isinstance(components, list):
         return jsonify({"error": "components must be a list."}), 400
 
-    default_config = _default_price_config_for_survey(survey, survey.attributes)
+    default_config = _default_price_config_for_survey(survey, attributes)
     if not default_config:
         return jsonify({"error": "This survey does not have a configurable price attribute."}), 400
 
@@ -805,7 +1068,7 @@ def update_conjoint_price_config(survey_id):
 
     return jsonify({
         "survey_id": survey.id,
-        "price_formula": _serialize_price_formula(_build_price_formula(survey, survey.attributes)),
+        "price_formula": _serialize_price_formula(_build_price_formula(survey, attributes)),
     })
 
 
@@ -1023,8 +1286,8 @@ def estimate_conjoint_survey(survey_id):
 
     source = _normalize_text(request.args.get("source", "all")) or "all"
     source = source.lower()
-    if source not in {"all", "human", "llm"}:
-        return jsonify({"error": "source must be one of: all, human, llm"}), 400
+    if source not in {"all", "human", "llm", "synthetic"}:
+        return jsonify({"error": "source must be one of: all, human, llm, synthetic"}), 400
 
     persona_id = request.args.get("persona_id")
     persona_id_int = None
@@ -1060,7 +1323,8 @@ def estimate_conjoint_survey(survey_id):
     level_stats = defaultdict(lambda: {"wins": 0, "appearances": 0})
     task_choice_stats = defaultdict(lambda: {"A": 0, "B": 0, "total": 0})
 
-    for attribute in survey.attributes:
+    attributes = _analysis_attributes(survey.attributes, survey)
+    for attribute in attributes:
         for level in attribute.levels:
             _ = level_stats[(attribute.name, level.value)]
 
@@ -1080,7 +1344,7 @@ def estimate_conjoint_survey(survey_id):
     utilities = {}
     importance_ranges = {}
 
-    for attribute in survey.attributes:
+    for attribute in attributes:
         attr_name = attribute.name
         attr_levels = [level.value for level in attribute.levels]
 
@@ -1113,7 +1377,7 @@ def estimate_conjoint_survey(survey_id):
             importance[attr_name] = round((attr_range / total_range) * 100, 2)
 
     level_choice_rate = []
-    for attribute in survey.attributes:
+    for attribute in attributes:
         for level in attribute.levels:
             stats = level_stats[(attribute.name, level.value)]
             appearances = stats["appearances"]

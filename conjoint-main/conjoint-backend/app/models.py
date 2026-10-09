@@ -62,6 +62,8 @@ class ConjointSurvey(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     price_config = db.Column(db.JSON, nullable=False, default=dict)
+    design_config = db.Column(db.JSON, nullable=False, default=dict)
+    is_archived = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     attributes = db.relationship(

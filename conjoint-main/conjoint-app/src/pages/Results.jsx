@@ -213,6 +213,7 @@ function Results() {
               <option value="all">All Respondents</option>
               <option value="human">Human Only</option>
               <option value="llm">LLM Only</option>
+              <option value="synthetic">Synthetic Test Runs</option>
             </select>
           </div>
 

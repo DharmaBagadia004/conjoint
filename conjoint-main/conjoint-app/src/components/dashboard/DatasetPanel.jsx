@@ -4,7 +4,7 @@ function DatasetPanel({ datasets, selectedDatasetId, onSelect }) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-900">
-            Datasets
+            Surveys
           </h2>
           <p className="text-xs leading-4 text-slate-500">
             Study selector
@@ -13,6 +13,9 @@ function DatasetPanel({ datasets, selectedDatasetId, onSelect }) {
       </div>
 
       <div className="space-y-3">
+        {datasets.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">{selectedDatasetId ? "Loading studies..." : "No surveys have been created yet."}</p>
+        ) : null}
         {datasets.map((dataset) => {
           const active = dataset.id === selectedDatasetId;
           return (

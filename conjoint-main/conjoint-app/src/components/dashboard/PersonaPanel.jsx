@@ -40,6 +40,9 @@ function PersonaPanel({
       />
 
       <div className="mt-2 space-y-3">
+        {personas.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-500">Response groups appear after respondents complete tasks or persona simulations are run.</p>
+        ) : null}
         {personas.map((persona) => {
           const selected = selectedSet.has(persona.id);
           const chip = colorMap[persona.id];

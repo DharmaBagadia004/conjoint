@@ -26,6 +26,39 @@ def _ensure_conjoint_price_config_column(app):
                 text("UPDATE conjoint_survey SET price_config = '{}' WHERE price_config IS NULL")
             )
 
+
+def _ensure_conjoint_design_config_column(app):
+    with app.app_context():
+        inspector = inspect(db.engine)
+        try:
+            columns = {column["name"] for column in inspector.get_columns("conjoint_survey")}
+        except NoSuchTableError:
+            return
+        if "design_config" in columns:
+            return
+
+        with db.engine.begin() as connection:
+            connection.execute(text("ALTER TABLE conjoint_survey ADD COLUMN design_config JSON"))
+            connection.execute(
+                text("UPDATE conjoint_survey SET design_config = '{}' WHERE design_config IS NULL")
+            )
+
+
+def _ensure_conjoint_archive_column(app):
+    with app.app_context():
+        inspector = inspect(db.engine)
+        try:
+            columns = {column["name"] for column in inspector.get_columns("conjoint_survey")}
+        except NoSuchTableError:
+            return
+        if "is_archived" in columns:
+            return
+
+        with db.engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE conjoint_survey ADD COLUMN is_archived BOOLEAN NOT NULL DEFAULT 0")
+            )
+
 def create_app(config_object=Config):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_object)
@@ -40,5 +73,7 @@ def create_app(config_object=Config):
     from .routes import bp
     app.register_blueprint(bp)
     _ensure_conjoint_price_config_column(app)
+    _ensure_conjoint_design_config_column(app)
+    _ensure_conjoint_archive_column(app)
 
     return app

@@ -4,7 +4,6 @@ import { consolidatePreferences, rankAttributes, rankDistribution } from "./rank
 import UtilityExportButton from "./UtilityExportButton";
 
 const percent = (value) => `${(value * 100).toFixed(1)}%`;
-const rankColors = ["#047857", "#0284c7", "#7c3aed", "#d97706", "#e11d48", "#475569"];
 
 function LevelExtremes({ levels, scoreKey = "utility" }) {
   if (!levels.length) return <p className="text-xs text-slate-500">No levels available</p>;
@@ -116,22 +115,59 @@ function ParallelCoordinates({ personas }) {
   );
 }
 
-function RankDistribution({ personas }) {
+function RankComparisonPlot({ personas }) {
   const rows = rankDistribution(personas);
+  const personaColors = getPersonaColorMap(personas);
+  const rankCount = Math.max(1, ...rows.map((row) => row.counts.length));
+  const chartWidth = 920;
+  const chartLeft = 190;
+  const chartRight = 32;
+  const chartTop = 20;
+  const rowHeight = 54;
+  const chartBottom = chartTop + rows.length * rowHeight;
+  const rankX = (rank) => rankCount === 1
+    ? chartLeft + (chartWidth - chartLeft - chartRight) / 2
+    : chartLeft + ((rank - 1) / (rankCount - 1)) * (chartWidth - chartLeft - chartRight);
+
   return (
     <div className="space-y-5">
-      <div><h2 className="text-xl font-semibold text-slate-900">Which attribute ranks first?</h2><p className="mt-1 text-sm text-slate-500">How often each attribute takes each rank across {personas.length} selected {personas.length === 1 ? "persona" : "personas"}.</p></div>
-      <div className="flex flex-wrap gap-4 text-xs text-slate-600">{rows[0]?.counts.map((_, i) => <span key={i} className="flex items-center gap-2"><span className="h-3 w-3 rounded" style={{ background: rankColors[i % rankColors.length] }} />Rank {i + 1}</span>)}</div>
-      <div className="space-y-5">{rows.map((row) => <div key={row.id}>
-        <div className="mb-2 flex justify-between gap-2 text-sm"><span className="font-medium text-slate-800">{row.name}</span><span className="text-xs text-slate-500">Mean rank {row.meanRank.toFixed(1)}</span></div>
-        <div className="flex h-10 overflow-hidden rounded-lg bg-slate-100" role="img" aria-label={`${row.name}: ${row.personaRanks.map((entry) => `${entry.personaName}: rank ${entry.rank}`).join(", ")}`}>
-          {row.counts.map((count, i) => count ? <div key={i} style={{ width: `${count / row.total * 100}%`, background: rankColors[i % rankColors.length] }} className="flex items-center justify-center text-xs font-semibold text-white" title={`Rank ${i + 1}: ${count} of ${row.total} personas. ${row.personaRanks.filter((entry) => entry.rank === i + 1).map((entry) => entry.personaName).join(", ")}`}>#{i + 1} · {count}</div> : null)}
-        </div>
-      </div>)}</div>
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900">Attribute importance rank by persona</h2>
+        <p className="mt-1 text-sm text-slate-500">Compare each selected persona's rank for every attribute. Rank #1 is most important.</p>
+      </div>
+      <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-600" role="list" aria-label="Persona colors">
+        {personas.map((persona) => <span key={persona.id} role="listitem" className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: personaColors[persona.id]?.stroke }} />{persona.name}</span>)}
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-3">
+        <svg viewBox={`0 0 ${chartWidth} ${chartBottom + 42}`} style={{ minWidth: chartWidth }} className="w-full" role="img" aria-label="Attribute importance ranks compared across selected personas">
+          {Array.from({ length: rankCount }, (_, index) => index + 1).map((rank) => (
+            <g key={rank}>
+              <line x1={rankX(rank)} x2={rankX(rank)} y1={chartTop - 8} y2={chartBottom} stroke="#e2e8f0" />
+              <text x={rankX(rank)} y={chartBottom + 23} textAnchor="middle" fontSize="11" fill="#64748b">#{rank}</text>
+            </g>
+          ))}
+          {rows.map((row, rowIndex) => {
+            const centerY = chartTop + rowIndex * rowHeight + rowHeight / 2;
+            return <g key={row.id}>
+              <text x={chartLeft - 14} y={centerY + 4} textAnchor="end" fontSize="12" fill="#334155">{row.name}</text>
+              <line x1={chartLeft} x2={chartWidth - chartRight} y1={centerY} y2={centerY} stroke="#f1f5f9" />
+              {personas.map((persona, personaIndex) => {
+                const entry = row.personaRanks.find((item) => item.personaId === persona.id);
+                if (!entry) return null;
+                const offset = (personaIndex - (personas.length - 1) / 2) * 8;
+                return <circle key={persona.id} cx={rankX(entry.rank)} cy={centerY + offset} r="5" fill={personaColors[persona.id]?.stroke || "#475569"} stroke="white" strokeWidth="1.5">
+                  <title>{`${persona.name}: ${row.name}, rank #${entry.rank}, ${percent(entry.importance)} importance`}</title>
+                </circle>;
+              })}
+            </g>;
+          })}
+          <text x={(chartLeft + chartWidth - chartRight) / 2} y={chartBottom + 40} textAnchor="middle" fontSize="11" fill="#64748b">Importance rank · lower rank is more important</text>
+        </svg>
+      </div>
       <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full text-left text-sm">
           <caption className="bg-slate-50 p-4 text-left">
-            <span className="block font-semibold text-slate-800">Rank by persona</span>
+            <span className="block font-semibold text-slate-800">Exact rank by persona</span>
             <span className="mt-1 block text-xs text-slate-500">Each cell shows the attribute's rank and importance for that persona.</span>
           </caption>
           <thead className="border-y border-slate-200 bg-slate-50 text-slate-700">
@@ -145,7 +181,7 @@ function RankDistribution({ personas }) {
                   const entry = row.personaRanks.find((item) => item.personaId === persona.id);
                   return <td key={persona.id} className="px-4 py-3">{entry ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded px-2 py-1 text-xs font-semibold text-white" style={{ background: rankColors[(entry.rank - 1) % rankColors.length] }}>#{entry.rank}</span>
+                      <span className="rounded px-2 py-1 text-xs font-semibold text-white" style={{ background: personaColors[persona.id]?.stroke || "#475569" }}>#{entry.rank}</span>
                       <span className="text-xs tabular-nums text-slate-500">{percent(entry.importance)}</span>
                     </div>
                   ) : <span className="text-xs text-slate-500">Not available</span>}</td>;
@@ -157,10 +193,10 @@ function RankDistribution({ personas }) {
       </div>
       <div className="rounded-xl bg-slate-50 p-4 text-xs leading-5 text-slate-600">
         <p className="font-semibold text-slate-800">How to read this chart</p>
-        <p className="mt-1">Each row is an attribute. Colors represent ranks, and segment widths show the share of selected personas assigning that rank. A label such as #1 &middot; 2 means two personas rank the attribute first.</p>
-        <p className="mt-2">Hover over a segment to see the persona names, or use the table above to see every persona's exact rank.</p>
-        <p className="mt-2">Mean rank averages the ranks across personas; lower means more important. Rows are sorted from lowest to highest mean rank. Each persona has equal weight.</p>
-        <p className="mt-2">Ranks come from attribute importance, not observed respondent rankings. Tied attributes share a rank and skip the next position (1, 1, 3).</p>
+        <p className="mt-1">Each row is an attribute and each colored dot is a persona. Dots are vertically offset when personas share the same rank.</p>
+        <p className="mt-2">Hover over a dot for the persona name and importance score. The table gives the exact rank and importance for every persona.</p>
+        <p className="mt-2">Rows are sorted by mean rank across personas; lower mean rank means greater importance. Each persona has equal weight.</p>
+        <p className="mt-2">Ranks are calculated from estimated attribute importance, not observed respondent rankings. Ties share a rank and skip the next position (1, 1, 3).</p>
       </div>
     </div>
   );
@@ -172,7 +208,7 @@ export default function PreferenceInsights({ view, personas }) {
       {view === "highlights" && <PersonaHighlights personas={personas} />}
       {view === "product" && <ProductView personas={personas} />}
       {view === "parallel" && <ParallelCoordinates personas={personas} />}
-      {view === "ranks" && <RankDistribution personas={personas} />}
+      {view === "ranks" && <RankComparisonPlot personas={personas} />}
     </section>
   );
 }

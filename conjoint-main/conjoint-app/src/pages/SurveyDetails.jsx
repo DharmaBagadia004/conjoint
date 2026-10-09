@@ -8,6 +8,10 @@ function SurveyDetails() {
 
   const [survey, setSurvey] = useState(null);
   const [priceComponents, setPriceComponents] = useState([]);
+  const [prohibitedPairs, setProhibitedPairs] = useState([]);
+  const [pairDraft, setPairDraft] = useState({ attribute_a: "", level_a: "", attribute_b: "", level_b: "" });
+  const [designStats, setDesignStats] = useState(null);
+  const [isSavingProhibitedPairs, setIsSavingProhibitedPairs] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingPriceConfig, setIsSavingPriceConfig] = useState(false);
   const [error, setError] = useState("");
@@ -50,6 +54,17 @@ function SurveyDetails() {
         );
         setSurvey(response.data);
         setPriceComponents(response.data.price_formula?.components || []);
+        const attributes = response.data.attributes || [];
+        setProhibitedPairs(response.data.prohibited_pairs || []);
+        setDesignStats(response.data.design_stats || null);
+        if (attributes.length >= 2) {
+          setPairDraft({
+            attribute_a: String(attributes[0].id),
+            level_a: String(attributes[0].levels[0]?.id || ""),
+            attribute_b: String(attributes[1].id),
+            level_b: String(attributes[1].levels[0]?.id || "")
+          });
+        }
       } catch (err) {
         console.error(err);
         setError("Unable to load this survey.");
@@ -60,6 +75,42 @@ function SurveyDetails() {
 
     fetchSurvey();
   }, [id]);
+
+  const addProhibitedPair = () => {
+    if (!pairDraft.attribute_a || !pairDraft.level_a || !pairDraft.attribute_b || !pairDraft.level_b) return;
+    setProhibitedPairs((current) => [...current, {
+      attribute_a: Number(pairDraft.attribute_a),
+      level_a: Number(pairDraft.level_a),
+      attribute_b: Number(pairDraft.attribute_b),
+      level_b: Number(pairDraft.level_b)
+    }]);
+  };
+
+  const saveProhibitedPairs = async () => {
+    try {
+      setIsSavingProhibitedPairs(true);
+      const response = await axios.patch(
+        `http://localhost:5000/api/conjoint-surveys/${id}/prohibited-pairs`,
+        { prohibited_pairs: prohibitedPairs.map(({ attribute_a, level_a, attribute_b, level_b }) => ({ attribute_a, level_a, attribute_b, level_b })) }
+      );
+      setProhibitedPairs(response.data.prohibited_pairs || []);
+      setDesignStats(response.data.design_stats || null);
+      setSurvey((current) => ({
+        ...current,
+        price_formula: response.data.price_formula,
+        price_formula_disabled_reason: response.data.price_formula_disabled_reason
+      }));
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.error || "Unable to save profile restrictions.");
+    } finally {
+      setIsSavingProhibitedPairs(false);
+    }
+  };
+
+  const attributes = survey?.attributes || [];
+  const attributeA = attributes.find((attribute) => String(attribute.id) === pairDraft.attribute_a);
+  const attributeB = attributes.find((attribute) => String(attribute.id) === pairDraft.attribute_b);
 
   const updateWeight = (attribute, nextPercent) => {
     const nextValue = Number(nextPercent);
@@ -178,6 +229,97 @@ function SurveyDetails() {
         ))}
       </div>
 
+      <section className="mt-10 rounded-3xl border border-amber-200 bg-amber-50/60 p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-amber-700">Choice Design</p>
+            <h2 className="mt-2 text-xl font-semibold text-slate-900">Prohibited level pairs</h2>
+            <p className="mt-2 max-w-2xl text-sm text-slate-600">
+              Prevent unrealistic combinations from appearing together in one vehicle profile. Use these restrictions sparingly so the attributes can still be compared independently.
+            </p>
+          </div>
+          <button
+            onClick={saveProhibitedPairs}
+            disabled={isSavingProhibitedPairs}
+            className="rounded-full bg-amber-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSavingProhibitedPairs ? "Saving..." : "Save Restrictions"}
+          </button>
+        </div>
+
+        {designStats && (
+          <p className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-slate-700">
+            {designStats.valid_profiles_capped
+              ? `At least ${designStats.valid_profiles.toLocaleString()} of ${designStats.total_profiles.toLocaleString()} possible profiles remain.`
+              : `${designStats.valid_profiles.toLocaleString()} of ${designStats.total_profiles.toLocaleString()} possible profiles remain.`}
+          </p>
+        )}
+        {survey.price_formula_disabled_reason && (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-white px-4 py-3 text-sm text-amber-900">
+            {survey.price_formula_disabled_reason}
+          </p>
+        )}
+
+        <div className="mt-5 grid gap-3 rounded-2xl border border-amber-200 bg-white p-4 md:grid-cols-[1fr_1fr_auto_1fr_1fr_auto] md:items-end">
+          <label className="text-xs font-medium text-slate-600">Attribute
+            <select value={pairDraft.attribute_a} onChange={(event) => {
+              const next = attributes.find((attribute) => String(attribute.id) === event.target.value);
+              setPairDraft((current) => {
+                const nextB = current.attribute_b === event.target.value
+                  ? attributes.find((attribute) => String(attribute.id) !== event.target.value)
+                  : attributes.find((attribute) => String(attribute.id) === current.attribute_b);
+                return {
+                  ...current,
+                  attribute_a: event.target.value,
+                  level_a: String(next?.levels[0]?.id || ""),
+                  attribute_b: String(nextB?.id || ""),
+                  level_b: String(nextB?.levels[0]?.id || "")
+                };
+              });
+            }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              {attributes.map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-slate-600">Level
+            <select value={pairDraft.level_a} onChange={(event) => setPairDraft((current) => ({ ...current, level_a: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              {(attributeA?.levels || []).map((level) => <option key={level.id} value={level.id}>{level.value}</option>)}
+            </select>
+          </label>
+          <span className="pb-2 text-center text-sm text-slate-500">with</span>
+          <label className="text-xs font-medium text-slate-600">Attribute
+            <select value={pairDraft.attribute_b} onChange={(event) => {
+              const next = attributes.find((attribute) => String(attribute.id) === event.target.value);
+              setPairDraft((current) => ({ ...current, attribute_b: event.target.value, level_b: String(next?.levels[0]?.id || "") }));
+            }} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              {attributes.filter((attribute) => String(attribute.id) !== pairDraft.attribute_a).map((attribute) => <option key={attribute.id} value={attribute.id}>{attribute.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs font-medium text-slate-600">Level
+            <select value={pairDraft.level_b} onChange={(event) => setPairDraft((current) => ({ ...current, level_b: event.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              {(attributeB?.levels || []).map((level) => <option key={level.id} value={level.id}>{level.value}</option>)}
+            </select>
+          </label>
+          <button onClick={addProhibitedPair} disabled={attributes.length < 2} className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-medium text-amber-800 hover:bg-amber-50 disabled:opacity-50">Add pair</button>
+        </div>
+
+        {prohibitedPairs.length > 0 ? (
+          <ul className="mt-4 space-y-2">
+            {prohibitedPairs.map((pair, index) => {
+              const leftAttribute = attributes.find((attribute) => attribute.id === Number(pair.attribute_a));
+              const rightAttribute = attributes.find((attribute) => attribute.id === Number(pair.attribute_b));
+              const leftLevel = leftAttribute?.levels.find((level) => level.id === Number(pair.level_a));
+              const rightLevel = rightAttribute?.levels.find((level) => level.id === Number(pair.level_b));
+              return (
+                <li key={`${pair.attribute_a}-${pair.level_a}-${pair.attribute_b}-${pair.level_b}-${index}`} className="flex items-center justify-between gap-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-700">
+                  <span>{leftAttribute?.name}: <strong>{leftLevel?.value}</strong> + {rightAttribute?.name}: <strong>{rightLevel?.value}</strong></span>
+                  <button onClick={() => setProhibitedPairs((current) => current.filter((_, pairIndex) => pairIndex !== index))} className="text-sm font-medium text-rose-700 hover:underline">Remove</button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <p className="mt-4 text-sm text-slate-500">No combinations are currently restricted.</p>}
+      </section>
+
       {survey.price_formula && (
         <section className="mt-10 rounded-3xl border border-emerald-200 bg-emerald-50/70 p-6 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-emerald-700">
@@ -251,7 +393,7 @@ function SurveyDetails() {
                   Edit Equation Inputs
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Choose which attributes to include. Included weights auto-adjust to total 100%.
+                  Choose which attributes affect price. Categorical price levels are assigned from their weighted scores. For this to reflect vehicle tiers, order Brand levels from economy to premium and price levels from low to high. Brand starts with a 50% weight when no custom weights are configured.
                 </p>
               </div>
 

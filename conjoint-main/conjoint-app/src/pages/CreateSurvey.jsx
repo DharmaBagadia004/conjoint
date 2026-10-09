@@ -147,7 +147,7 @@ const saveSurvey = async () => {
     );
 
     alert("Survey saved successfully!");
-    navigate("/");
+    navigate("/analysis-dashboard");
   } catch (error) {
     console.error(error);
     alert("Error saving survey");
@@ -179,7 +179,7 @@ const importDatasetAndRun = async () => {
     );
 
     alert(`Survey "${response.data.title}" imported successfully.`);
-    navigate(`/run/${response.data.id}`);
+    navigate("/analysis-dashboard");
   } catch (error) {
     console.error(error);
     alert(
@@ -199,7 +199,7 @@ const importDatasetAndRun = async () => {
         Create Conjoint Survey
       </h1>
       <p className="text-gray-500 mt-2 text-sm">
-        Define attributes and levels for your study.
+        Define attributes and levels for your study. Use concrete values or numeric ranges for measurable attributes, such as price, instead of labels like Low or High.
       </p>
     </div>
 
@@ -209,7 +209,7 @@ const importDatasetAndRun = async () => {
         Import From Dataset
       </h2>
       <p className="text-sm text-gray-500 mb-4">
-        Upload a CSV or JSON file. Columns become attributes and unique values become levels.
+        Upload a CSV or JSON file to create a survey automatically. No manual attributes or levels are needed: column names become attributes, and unique values become levels. The survey title defaults to the file name.
       </p>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -234,12 +234,16 @@ const importDatasetAndRun = async () => {
           Selected file: {datasetFile.name}
         </p>
       )}
+
+      <p className="mt-3 text-xs text-gray-500">
+        Imported surveys appear in the Analysis Dashboard. You can run the survey there; response data is needed before analysis charts can be calculated.
+      </p>
     </div>
 
     {/* Survey Title */}
     <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm mb-8">
       <label className="block text-sm font-medium text-gray-700 mb-2">
-        Survey Title
+        Survey Title <span className="font-normal text-gray-500">(required to create manually; optional for dataset import)</span>
       </label>
 
       <input
@@ -298,7 +302,7 @@ const importDatasetAndRun = async () => {
               >
                 <input
                   type="text"
-                  placeholder="Level value (e.g. $500)"
+                  placeholder="Level value (e.g. $25k-$35k)"
                   value={level.value}
                   onChange={(e) =>
                     updateLevel(attr.id, level.id, e.target.value)

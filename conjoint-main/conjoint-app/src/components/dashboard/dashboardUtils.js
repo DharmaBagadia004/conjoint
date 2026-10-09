@@ -18,6 +18,11 @@ const personaPalette = [
     fill: "#8b5cf6",
     stroke: "#7c3aed",
     soft: "bg-violet-50 text-violet-700 border-violet-200"
+  },
+  {
+    fill: "#f43f5e",
+    stroke: "#e11d48",
+    soft: "bg-rose-50 text-rose-700 border-rose-200"
   }
 ];
 

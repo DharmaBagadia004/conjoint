@@ -113,7 +113,7 @@ function PersonaRunner() {
       );
 
       navigate(
-        `/results/${id}?source=llm&persona_id=${persona.id}`
+        `/analysis-dashboard?surveyId=${id}`
       );
     } catch (error) {
       console.error(error);
@@ -153,12 +153,21 @@ function PersonaRunner() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-10">
-        <h1 className="text-3xl font-semibold text-gray-900">
-          Persona Simulation
-        </h1>
-        <p className="text-sm text-gray-500 mt-2">
-          {survey?.title}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold text-gray-900">Create a Persona</h1>
+            <p className="mt-2 text-sm text-gray-500">Create a persona for {survey?.title}, then run an optional simulation or continue to analysis.</p>
+          </div>
+          {personas.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => navigate(`/analysis-dashboard?surveyId=${id}`)}
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Skip simulation and view analysis
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -298,7 +307,7 @@ function PersonaRunner() {
                     >
                       {runningPersonaId === persona.id
                         ? "Running..."
-                        : "Run with LLM"}
+                        : "Run test with this persona"}
                     </button>
                   </div>
                 </div>

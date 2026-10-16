@@ -141,13 +141,12 @@ const saveSurvey = async () => {
       }))
     };
 
-    await axios.post(
+    const response = await axios.post(
       "http://localhost:5000/api/conjoint-surveys",
       payload
     );
 
-    alert("Survey saved successfully!");
-    navigate("/analysis-dashboard");
+    navigate(`/personas/${response.data.id}`);
   } catch (error) {
     console.error(error);
     alert("Error saving survey");
@@ -178,8 +177,7 @@ const importDatasetAndRun = async () => {
       }
     );
 
-    alert(`Survey "${response.data.title}" imported successfully.`);
-    navigate("/analysis-dashboard");
+    navigate(`/personas/${response.data.id}`);
   } catch (error) {
     console.error(error);
     alert(
@@ -225,7 +223,7 @@ const importDatasetAndRun = async () => {
           disabled={isImporting}
           className="bg-emerald-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isImporting ? "Importing..." : "Import Dataset & Run Survey"}
+          {isImporting ? "Importing..." : "Import Dataset"}
         </button>
       </div>
 
@@ -236,7 +234,7 @@ const importDatasetAndRun = async () => {
       )}
 
       <p className="mt-3 text-xs text-gray-500">
-        Imported surveys appear in the Analysis Dashboard. You can run the survey there; response data is needed before analysis charts can be calculated.
+        After import, create a persona and choose whether to run a simulation now or continue to analysis.
       </p>
     </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import DatasetPanel from "../components/dashboard/DatasetPanel";
@@ -43,6 +43,7 @@ function getDefaultPersonaSelection(dataset, mode) {
 function toDashboardPersona(id, name, description, survey, analysis) {
   return {
     id,
+    sourcePersonaId: id.replace(/^persona-/, ""),
     name,
     description,
     respondents: analysis.respondents,
@@ -110,6 +111,8 @@ async function loadDashboardDataset(surveySummary) {
 
 function ConjointDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedSurveyId = searchParams.get("surveyId");
   const [datasets, setDatasets] = useState([]);
   const [selectedDatasetId, setSelectedDatasetId] = useState("");
   const [mode, setMode] = useState("single");
@@ -129,6 +132,8 @@ function ConjointDashboard() {
   const [utilityFilter, setUtilityFilter] = useState("all");
   const [selectionWarning, setSelectionWarning] = useState("");
   const [activeSectionId, setActiveSectionId] = useState("highlights");
+  const [isRunningPersonaTests, setIsRunningPersonaTests] = useState(false);
+  const [personaTestMessage, setPersonaTestMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -140,9 +145,10 @@ function ConjointDashboard() {
         const loadedDatasets = await Promise.all(response.data.map(loadDashboardDataset));
         if (!isMounted) return;
         setDatasets(loadedDatasets);
-        const firstDataset = loadedDatasets[0];
-        setSelectedDatasetId(firstDataset?.id || "");
-        setSelectedPersonaIds(getDefaultPersonaSelection(firstDataset, "single"));
+        const requestedDataset = loadedDatasets.find((dataset) => String(dataset.surveyId) === requestedSurveyId);
+        const initialDataset = requestedDataset || loadedDatasets[0];
+        setSelectedDatasetId(initialDataset?.id || "");
+        setSelectedPersonaIds(getDefaultPersonaSelection(initialDataset, "single"));
       } catch (error) {
         console.error(error);
         if (isMounted) setLoadError("Unable to load surveys from the backend. Check that the backend server is running.");
@@ -152,7 +158,7 @@ function ConjointDashboard() {
     };
     loadDatasets();
     return () => { isMounted = false; };
-  }, []);
+  }, [requestedSurveyId]);
 
   const selectedDataset = useMemo(
     () => datasets.find((dataset) => dataset.id === selectedDatasetId) ?? datasets[0] ?? null,
@@ -248,6 +254,35 @@ function ConjointDashboard() {
     }
   };
 
+  const runSelectedPersonaTests = async () => {
+    if (!selectedDataset || selectedPersonas.length === 0 || isRunningPersonaTests) return;
+
+    try {
+      setIsRunningPersonaTests(true);
+      setPersonaTestMessage("");
+      for (const persona of selectedPersonas) {
+        await axios.post(
+          `${API_URL}/conjoint-surveys/${selectedDataset.surveyId}/personas/${persona.sourcePersonaId}/run`,
+          { num_tasks: 8 }
+        );
+      }
+
+      const refreshedDataset = await loadDashboardDataset({
+        id: selectedDataset.surveyId,
+        title: selectedDataset.name
+      });
+      setDatasets((current) => current.map((dataset) =>
+        dataset.id === refreshedDataset.id ? refreshedDataset : dataset
+      ));
+      setPersonaTestMessage(`Test completed for ${selectedPersonas.length} ${selectedPersonas.length === 1 ? "persona" : "personas"}.`);
+    } catch (error) {
+      console.error(error);
+      setPersonaTestMessage(error?.response?.data?.error || "Unable to run the selected persona test(s).");
+    } finally {
+      setIsRunningPersonaTests(false);
+    }
+  };
+
   const handleModeChange = (nextMode) => {
     if (nextMode === mode) return;
     setMode(nextMode);
@@ -317,11 +352,19 @@ function ConjointDashboard() {
               {mode === "single" ? "Individual analysis" : "Persona comparison"}
             </div>
           </div>
-          {selectedDataset.priceFormula || selectedDataset.priceFormulaDisabledReason ? (
-            <button type="button" onClick={() => setPriceSettingsOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/15">
-              Study settings
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => navigate(`/personas/${selectedDataset.surveyId}`)} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/15">
+              Create persona
             </button>
-          ) : null}
+            <button type="button" onClick={runSelectedPersonaTests} disabled={!selectedPersonas.length || isRunningPersonaTests} className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-400 disabled:cursor-not-allowed disabled:opacity-50">
+              {isRunningPersonaTests ? "Running persona test(s)..." : mode === "comparison" ? "Run selected persona tests" : "Run persona test"}
+            </button>
+            {selectedDataset.priceFormula || selectedDataset.priceFormulaDisabledReason ? (
+              <button type="button" onClick={() => setPriceSettingsOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/15">
+                Study settings
+              </button>
+            ) : null}
+          </div>
         </div>
       </header>
 
@@ -391,11 +434,15 @@ function ConjointDashboard() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-slate-500" aria-live="polite">View {sectionIndex + 1} of {sections.length} &middot; {sections[sectionIndex].label}</p>
           </div>
+          {personaTestMessage ? <p role="status" className={`rounded-lg px-3 py-2 text-sm ${personaTestMessage.startsWith("Test completed") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>{personaTestMessage}</p> : null}
           {selectedDataset.personas.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center shadow-sm">
               <h3 className="text-lg font-semibold text-slate-900">No response analysis yet</h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">Create or select personas and run their LLM simulations to populate these charts.</p>
-              <button type="button" onClick={() => navigate(`/run/${selectedDataset.surveyId}`)} className="mt-5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Run this survey</button>
+              <p className="mx-auto mt-2 max-w-xl text-sm text-slate-500">Run the survey to collect responses, or create a persona to run a simulated test. Analysis charts appear after responses are available.</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-3">
+                <button type="button" onClick={() => navigate(`/run/${selectedDataset.surveyId}`)} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Run this survey</button>
+                <button type="button" onClick={() => navigate(`/personas/${selectedDataset.surveyId}`)} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Create a persona</button>
+              </div>
             </div>
           ) : mode === "comparison" && selectedPersonas.length < 2 ? (
             <EmptyState title="Select at least two personas" message="Choose two to five personas in the sidebar to compare preferences and rankings." />

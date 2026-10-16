@@ -69,7 +69,7 @@ useEffect(() => {
       if (saved) {
         setResponses(updatedResponses);
         setCompleted(true);
-        navigate(`/results/${id}`);
+        navigate(`/analysis-dashboard?surveyId=${id}`);
       }
       return;
     }
